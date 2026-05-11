@@ -25,7 +25,7 @@ class ParseTransactionHistoryUseCaseTest {
         val rec = records[0]
         assertEquals(5000, rec.balance)
         assertEquals(0, rec.amount)
-        assertEquals(ProcessType.ENTRY, rec.processType)
+        assertEquals(ProcessType.EXIT, rec.processType)
     }
 
     @Test
@@ -49,6 +49,7 @@ class ParseTransactionHistoryUseCaseTest {
 
         assertEquals(2, records.size)
         assertEquals(200, records[0].amount)
+        assertEquals(ProcessType.EXIT, records[0].processType)
     }
 
     @Test

@@ -36,7 +36,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         }.runCatchingTimeInMillis() ?: return null
 
         val processType = when (processCode) {
-            0x01 -> ProcessType.ENTRY
+            0x01 -> ProcessType.EXIT
             0x02 -> ProcessType.CHARGE
             0x0F, 0x1F -> ProcessType.ENTRY
             0x03, 0x23 -> ProcessType.PURCHASE
@@ -58,7 +58,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
             balance = balance,
             entryStationCode = encodeStation(entryLine, entryStation),
             exitStationCode = encodeStation(exitLine, exitStation),
-            details = buildDetails(terminalType, processCode, entryLine, entryStation, exitLine, exitStation, region, sequence)
+            details = buildDetails(terminalType, processCode, region, sequence)
         )
     }
 
@@ -85,21 +85,26 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
     private fun buildDetails(
         terminalType: Int,
         processCode: Int,
-        entryLine: Int,
-        entryStation: Int,
-        exitLine: Int,
-        exitStation: Int,
         region: Int,
         sequence: Int
     ): String =
-        "terminal=0x${terminalType.toHex()}, process=0x${processCode.toHex()}, " +
-            "from=${entryLine.toCode()}-${entryStation.toCode()}, " +
-            "to=${exitLine.toCode()}-${exitStation.toCode()}, " +
-            "region=0x${region.toHex()}, sequence=$sequence"
+        "端末=${terminalType.toTerminalName()} / 処理=0x${processCode.toHex()} / 地域=0x${region.toHex()} / 連番=$sequence"
 
     private fun Int.toHex(): String = toString(16).padStart(2, '0')
 
-    private fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()
+    private fun Int.toTerminalName(): String = when (this) {
+        0x03 -> "精算機"
+        0x05 -> "バス"
+        0x07, 0x08, 0x09, 0x12, 0x13, 0x14, 0x15 -> "券売機"
+        0x16 -> "改札機"
+        0x17 -> "簡易改札"
+        0x18, 0x19 -> "窓口"
+        0x1C, 0x1D -> "乗継精算機"
+        0x46, 0x48 -> "ATM"
+        0xC7 -> "物販端末"
+        0xC8 -> "自販機"
+        else -> "0x${toHex()}"
+    }
 
     private data class ParsedTransitBlock(
         val transactionDate: Long,

@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import lol.hanyuu.iccardscanner.domain.model.ProcessType
 import lol.hanyuu.iccardscanner.domain.model.TransactionRecord
@@ -26,15 +27,16 @@ fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = record.processType.displayName,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = dateTimeFormatter.format(Instant.ofEpochMilli(record.transactionDate)),
+                text = dateFormatter.format(Instant.ofEpochMilli(record.transactionDate)) + "（時刻情報なし）",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
             )
@@ -42,7 +44,7 @@ fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
                 Text(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
                 )
             }
             record.details?.let { details ->
@@ -74,26 +76,20 @@ private fun formatAmount(record: TransactionRecord): String {
 }
 
 private fun stationSummary(record: TransactionRecord): String? {
-    val from = record.entryStationCode?.toStationCode()
-    val to = record.exitStationCode?.toStationCode()
+    val from = record.entryStationCode?.let(StationNameResolver::resolve)
+    val to = record.exitStationCode?.let(StationNameResolver::resolve)
+    val fromCode = record.entryStationCode?.let(StationNameResolver::code)
+    val toCode = record.exitStationCode?.let(StationNameResolver::code)
     return when {
-        from != null && to != null -> "区間 $from → $to"
-        from != null -> "駅 $from"
-        to != null -> "駅 $to"
+        from != null && to != null -> "区間 $from → $to（$fromCode → $toCode）"
+        from != null -> "駅 $from（$fromCode）"
+        to != null -> "駅 $to（$toCode）"
         else -> null
     }
 }
 
-private fun Int.toStationCode(): String {
-    val line = (this ushr 8) and 0xFF
-    val station = this and 0xFF
-    return "${line.toCode()}-${station.toCode()}"
-}
-
-private fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()
-
 private fun formatYen(value: Int): String =
     "¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(value)}"
 
-private val dateTimeFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss").withZone(ZoneId.of("Asia/Tokyo"))
+private val dateFormatter: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneId.of("Asia/Tokyo"))
