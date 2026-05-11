@@ -54,8 +54,8 @@ class FeliCaReader(private val nfcF: NfcF) {
      */
     fun readBlocks(serviceCode: Int, blockIndices: List<Int>): List<ByteArray> {
         require(blockIndices.isNotEmpty()) { "blockIndices must not be empty" }
-        require(blockIndices.size <= MAX_BLOCKS_PER_READ) {
-            "block count must be $MAX_BLOCKS_PER_READ or less: ${blockIndices.size}"
+        require(blockIndices.size <= maxBlocksPerRead) {
+            "block count must be $maxBlocksPerRead or less: ${blockIndices.size}"
         }
         require(blockIndices.all { it in 0..0xFF }) { "block index must be in 0..255" }
 
@@ -109,8 +109,10 @@ class FeliCaReader(private val nfcF: NfcF) {
 
     private fun Byte.toHex(): String = (toInt() and 0xFF).toString(16).padStart(2, '0')
 
+    val maxBlocksPerRead: Int get() = MAX_BLOCKS_PER_READ
+
     private companion object {
-        const val MAX_BLOCKS_PER_READ = 4
+        const val MAX_BLOCKS_PER_READ = 1
         const val MIN_READ_RESPONSE_SIZE = 12
         const val MIN_SUCCESS_READ_RESPONSE_SIZE = 13
         const val READ_WITHOUT_ENCRYPTION_RESPONSE: Byte = 0x07

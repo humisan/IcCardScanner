@@ -17,7 +17,7 @@ object StationNameResolver {
     @Volatile
     private var cachedStations: Map<Int, StationLabel>? = null
 
-    fun resolve(context: Context, areaCode: Int?, stationCode: Int): StationLabel {
+    fun resolve(context: Context, rawAreaCode: Int?, stationCode: Int): StationLabel {
         val line = (stationCode ushr 8) and 0xFF
         val station = stationCode and 0xFF
         val fallback = StationLabel(
@@ -26,8 +26,22 @@ object StationNameResolver {
             line = "不明",
             company = "不明"
         )
-        val area = areaCode ?: return fallback
-        return loadStations(context)[stationKey(area, line, station)] ?: fallback
+        val stations = loadStations(context)
+        val normalizedAreas = normalizeAreaCodes(rawAreaCode)
+        for (area in normalizedAreas) {
+            stations[stationKey(area, line, station)]?.let { return it }
+        }
+        return stations.values.firstOrNull { it.code == fallback.code } ?: fallback
+    }
+
+    private fun normalizeAreaCodes(rawAreaCode: Int?): List<Int> = when (rawAreaCode) {
+        0x00 -> listOf(0)
+        0x40 -> listOf(1)
+        0x80 -> listOf(2)
+        0xA0 -> listOf(2, 3)
+        0xC0 -> listOf(3)
+        null -> listOf(0, 1, 2, 3)
+        else -> listOf(rawAreaCode and 0x03, 0, 1, 2, 3).distinct()
     }
 
     private fun loadStations(context: Context): Map<Int, StationLabel> =

@@ -123,10 +123,16 @@ class ReadFeliCaUseCase @Inject constructor(
         -1
     }
 
-    private fun readTransitHistoryBlocks(reader: FeliCaReader): List<ByteArray> =
-        (0 until TRANSIT_HISTORY_BLOCK_COUNT)
-            .chunked(TRANSIT_HISTORY_READ_BATCH_SIZE)
-            .flatMap { blockIndices -> reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, blockIndices) }
+    private fun readTransitHistoryBlocks(reader: FeliCaReader): List<ByteArray> {
+        val blocks = mutableListOf<ByteArray>()
+        for (index in 0 until TRANSIT_HISTORY_BLOCK_COUNT) {
+            val block = runCatching { reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, listOf(index)).first() }
+                .onFailure { e -> Log.w(TAG, "History block $index read failed: ${e.message}") }
+                .getOrNull() ?: break
+            blocks += block
+        }
+        return blocks
+    }
 
     private fun parseTransitBalance(block: ByteArray): Int =
         ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
@@ -154,8 +160,7 @@ class ReadFeliCaUseCase @Inject constructor(
         const val TRANSIT_SYSTEM_CODE = 0x0003
         const val TRANSIT_BALANCE_SERVICE_CODE = 0x008B
         const val TRANSIT_HISTORY_SERVICE_CODE = 0x090F
-        const val TRANSIT_HISTORY_BLOCK_COUNT = 10   // reduced from 20 to minimize tag-lost risk
-        const val TRANSIT_HISTORY_READ_BATCH_SIZE = 4
+        const val TRANSIT_HISTORY_BLOCK_COUNT = 20
         const val NANACO_BALANCE_SERVICE_CODE = 0x564F
         const val WAON_BALANCE_SERVICE_CODE = 0x6817
         const val EDY_BALANCE_SERVICE_CODE = 0x170F
