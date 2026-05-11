@@ -48,7 +48,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         val entryStation = block[7].toInt() and 0xFF
         val exitLine = block[8].toInt() and 0xFF
         val exitStation = block[9].toInt() and 0xFF
-        val balance = ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
+        val balance = readBalance(block)
         val region = block[15].toInt() and 0xFF
         val sequence = ((block[13].toInt() and 0xFF) shl 8) or (block[12].toInt() and 0xFF)
 
@@ -82,13 +82,16 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         return (line shl 8) or station
     }
 
+    private fun readBalance(block: ByteArray): Int =
+        ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
+
     private fun buildDetails(
         terminalType: Int,
         processCode: Int,
         region: Int,
         sequence: Int
     ): String =
-        "端末=${terminalType.toTerminalName()} / 処理=0x${processCode.toHex()} / 地域=0x${region.toHex()} / 連番=$sequence"
+        "area=${region.toHex()};terminal=${terminalType.toTerminalName()};process=0x${processCode.toHex()};sequence=$sequence"
 
     private fun Int.toHex(): String = toString(16).padStart(2, '0')
 

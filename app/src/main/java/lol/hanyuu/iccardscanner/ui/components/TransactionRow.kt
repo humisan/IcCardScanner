@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import lol.hanyuu.iccardscanner.domain.model.ProcessType
@@ -22,6 +23,7 @@ import java.util.Locale
 
 @Composable
 fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -40,14 +42,14 @@ fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
             )
-            stationSummary(record)?.let { summary ->
+            stationSummary(context, record)?.let { summary ->
                 Text(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
                 )
             }
-            record.details?.let { details ->
+            detailsSummary(record)?.let { details ->
                 Text(
                     text = details,
                     style = MaterialTheme.typography.labelSmall,
@@ -75,18 +77,31 @@ private fun formatAmount(record: TransactionRecord): String {
     return "$sign${formatYen(record.amount)}"
 }
 
-private fun stationSummary(record: TransactionRecord): String? {
-    val from = record.entryStationCode?.let(StationNameResolver::resolve)
-    val to = record.exitStationCode?.let(StationNameResolver::resolve)
-    val fromCode = record.entryStationCode?.let(StationNameResolver::code)
-    val toCode = record.exitStationCode?.let(StationNameResolver::code)
+private fun stationSummary(context: android.content.Context, record: TransactionRecord): String? {
+    val area = record.details?.extractHex("area")
+    val from = record.entryStationCode?.let { StationNameResolver.resolve(context, area, it) }
+    val to = record.exitStationCode?.let { StationNameResolver.resolve(context, area, it) }
     return when {
-        from != null && to != null -> "区間 $from → $to（$fromCode → $toCode）"
-        from != null -> "駅 $from（$fromCode）"
-        to != null -> "駅 $to（$toCode）"
+        from != null && to != null -> "入場 ${from.displayName} → 退場 ${to.displayName}（${from.code} → ${to.code}）"
+        from != null -> "入場 ${from.displayName}（${from.code}）"
+        to != null -> "退場 ${to.displayName}（${to.code}）"
         else -> null
     }
 }
+
+private fun detailsSummary(record: TransactionRecord): String? {
+    val details = record.details ?: return null
+    val terminal = details.extractValue("terminal") ?: return null
+    val process = details.extractValue("process") ?: return null
+    val sequence = details.extractValue("sequence") ?: return null
+    return "端末 $terminal / 処理 $process / 連番 $sequence"
+}
+
+private fun String.extractValue(key: String): String? =
+    split(';').firstOrNull { it.startsWith("$key=") }?.substringAfter('=')
+
+private fun String.extractHex(key: String): Int? =
+    extractValue(key)?.toIntOrNull(16)
 
 private fun formatYen(value: Int): String =
     "¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(value)}"

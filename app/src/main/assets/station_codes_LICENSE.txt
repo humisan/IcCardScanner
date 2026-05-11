@@ -1,0 +1,6 @@
+station_codes.csv is derived from suica-viewer.
+
+MIT License
+Copyright (c) 2025 KIRISHIKI Yudai
+
+Source: https://github.com/soltia48/suica-viewer

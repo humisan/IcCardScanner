@@ -1,42 +1,67 @@
 package lol.hanyuu.iccardscanner.ui.components
 
-private data class StationInfo(
-    val company: String,
+import android.content.Context
+import java.io.BufferedReader
+import java.io.InputStreamReader
+
+data class StationLabel(
+    val code: String,
+    val name: String,
     val line: String,
-    val station: String
+    val company: String
 ) {
-    val label: String get() = "$station（$line）"
+    val displayName: String get() = "$name（$line）"
 }
 
 object StationNameResolver {
-    private val kansaiStations = mapOf(
-        stationKey(0x8A, 0x9C) to StationInfo("京都市交通局", "烏丸線", "今出川"),
-        stationKey(0x8B, 0xAC) to StationInfo("京都市交通局", "東西線", "二条"),
-        stationKey(0x8B, 0xB0) to StationInfo("京都市交通局", "東西線", "太秦天神川"),
-        stationKey(0xC5, 0x42) to StationInfo("京阪電気鉄道", "京阪本線", "丹波橋"),
-        stationKey(0xC5, 0x02) to StationInfo("京阪電気鉄道", "京阪本線", "淀屋橋"),
-        stationKey(0xC5, 0xCC) to StationInfo("京阪電気鉄道", "中之島線", "大江橋"),
-        stationKey(0x81, 0x1F) to StationInfo("大阪市高速電気軌道", "御堂筋線", "淀屋橋"),
-        stationKey(0x81, 0x24) to StationInfo("大阪市高速電気軌道", "御堂筋線", "なんば"),
-        stationKey(0xE9, 0x07) to StationInfo("近畿日本鉄道", "京都線", "向島"),
-        stationKey(0xE9, 0x1F) to StationInfo("近畿日本鉄道", "京都線", "大和西大寺"),
-        stationKey(0xE9, 0x24) to StationInfo("近畿日本鉄道", "橿原線", "近鉄郡山"),
-        stationKey(0x0B, 0x04) to StationInfo("西日本旅客鉄道", "片町線", "京田辺"),
-    )
+    @Volatile
+    private var cachedStations: Map<Int, StationLabel>? = null
 
-    fun resolve(stationCode: Int): String {
+    fun resolve(context: Context, areaCode: Int?, stationCode: Int): StationLabel {
         val line = (stationCode ushr 8) and 0xFF
         val station = stationCode and 0xFF
-        return kansaiStations[stationKey(line, station)]?.label ?: "駅コード ${line.toCode()}-${station.toCode()}"
+        val fallback = StationLabel(
+            code = "${line.toCode()}-${station.toCode()}",
+            name = "駅コード ${line.toCode()}-${station.toCode()}",
+            line = "不明",
+            company = "不明"
+        )
+        val area = areaCode ?: return fallback
+        return loadStations(context)[stationKey(area, line, station)] ?: fallback
     }
 
-    fun code(stationCode: Int): String {
-        val line = (stationCode ushr 8) and 0xFF
-        val station = stationCode and 0xFF
-        return "${line.toCode()}-${station.toCode()}"
+    private fun loadStations(context: Context): Map<Int, StationLabel> =
+        cachedStations ?: synchronized(this) {
+            cachedStations ?: readStations(context).also { cachedStations = it }
+        }
+
+    private fun readStations(context: Context): Map<Int, StationLabel> =
+        context.assets.open("station_codes.csv").use { input ->
+            BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
+                lines.drop(1).mapNotNull(::parseStationLine).associateBy { it.first }.mapValues { it.value.second }
+            }
+        }
+
+    private fun parseStationLine(line: String): Pair<Int, StationLabel>? {
+        val columns = line.split(',')
+        if (columns.size < 6) return null
+        val area = columns[0].toIntOrNull(16) ?: return null
+        val lineCode = columns[1].toIntOrNull(16) ?: return null
+        val stationCode = columns[2].toIntOrNull(16) ?: return null
+        val company = columns[3].ifBlank { "不明" }
+        val lineName = columns[4].ifBlank { "不明" }
+        val stationName = columns[5].ifBlank { return null }
+        val code = "${lineCode.toCode()}-${stationCode.toCode()}"
+        return stationKey(area, lineCode, stationCode) to StationLabel(
+            code = code,
+            name = stationName,
+            line = lineName,
+            company = company
+        )
     }
+
+    private fun stationKey(area: Int, line: Int, station: Int): Int =
+        (area shl 16) or (line shl 8) or station
 }
-
-private fun stationKey(line: Int, station: Int): Int = (line shl 8) or station
 
 private fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()

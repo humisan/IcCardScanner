@@ -44,8 +44,22 @@ class ReadFeliCaUseCase @Inject constructor(
                 Log.d(TAG, "nanaco/edy probe result=$cardType")
             }
 
-            // Read balance first (1 transceive) so DB save succeeds even if history read fails
-            val balance = readBalance(reader, cardType)
+            val transitBlocks = if (cardType.isTransitIc) {
+                runCatching { readTransitHistoryBlocks(reader) }
+                    .onFailure { e -> Log.w(TAG, "History read failed (non-fatal): ${e.message}") }
+                    .getOrDefault(emptyList())
+            } else {
+                emptyList()
+            }
+            if (transitBlocks.isNotEmpty()) {
+                Log.d(TAG, "transitBlocks.size=${transitBlocks.size}")
+            }
+
+            val balance = if (cardType.isTransitIc && transitBlocks.isNotEmpty()) {
+                parseTransitBalance(transitBlocks.first())
+            } else {
+                readBalance(reader, cardType)
+            }
             Log.d(TAG, "balance=$balance")
             if (cardType == CardType.UNKNOWN && balance < 0) {
                 throw IOException("Unsupported or unstable FeliCa system code: 0x${tagSystemCode.toString(16)}")
@@ -67,17 +81,10 @@ class ReadFeliCaUseCase @Inject constructor(
                 ScanRecordEntity(cardIdm = idmHex, scannedAt = now, balance = balance)
             )
 
-            // History is best-effort: tag may be lost partway through multi-block reads
-            if (cardType.isTransitIc) {
-                try {
-                    val transitBlocks = readTransitHistoryBlocks(reader)
-                    Log.d(TAG, "transitBlocks.size=${transitBlocks.size}")
-                    val records = parseHistory.invoke(idmHex, transitBlocks)
-                    historyRepository.replaceTransactions(idmHex, records)
-                    Log.d(TAG, "saved ${records.size} history records")
-                } catch (e: Exception) {
-                    Log.w(TAG, "History read failed (non-fatal): ${e.message}")
-                }
+            if (cardType.isTransitIc && transitBlocks.isNotEmpty()) {
+                val records = parseHistory.invoke(idmHex, transitBlocks)
+                historyRepository.replaceTransactions(idmHex, records)
+                Log.d(TAG, "saved ${records.size} history records")
             }
 
             idmHex
@@ -120,6 +127,9 @@ class ReadFeliCaUseCase @Inject constructor(
         (0 until TRANSIT_HISTORY_BLOCK_COUNT)
             .chunked(TRANSIT_HISTORY_READ_BATCH_SIZE)
             .flatMap { blockIndices -> reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, blockIndices) }
+
+    private fun parseTransitBalance(block: ByteArray): Int =
+        ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
 
     private fun resolveSystemCode(tagSystemCode: Int, availableSystemCodes: Set<Int>): Int {
         if (tagSystemCode != 0) return tagSystemCode
