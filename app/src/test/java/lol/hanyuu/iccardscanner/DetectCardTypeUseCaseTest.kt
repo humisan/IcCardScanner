@@ -14,8 +14,13 @@ class DetectCardTypeUseCaseTest {
     }
 
     @Test
-    fun `system code 0x0003 without issuer hint falls back to SUICA`() {
-        assertEquals(CardType.SUICA, useCase.invoke(0x0003, byteArrayOf(0x01)))
+    fun `system code 0x0003 with Suica specific system code returns SUICA`() {
+        assertEquals(CardType.SUICA, useCase.invoke(0x0003, byteArrayOf(), setOf(0x0003, 0x86A7)))
+    }
+
+    @Test
+    fun `system code 0x0003 without issuer hint falls back to ICOCA`() {
+        assertEquals(CardType.ICOCA, useCase.invoke(0x0003, byteArrayOf(0x01)))
     }
 
     @Test

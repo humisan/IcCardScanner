@@ -5,8 +5,12 @@ import javax.inject.Inject
 
 class DetectCardTypeUseCase @Inject constructor() {
 
-    fun invoke(systemCode: Int, idmBytes: ByteArray): CardType = when (systemCode) {
-        0x0003 -> detectTransitIc(idmBytes)
+    fun invoke(
+        systemCode: Int,
+        idmBytes: ByteArray,
+        availableSystemCodes: Set<Int> = emptySet()
+    ): CardType = when (systemCode) {
+        0x0003 -> detectTransitIc(idmBytes, availableSystemCodes)
         0xFE00 -> CardType.WAON
         0x88B4 -> CardType.NANACO
         else -> CardType.UNKNOWN
@@ -14,8 +18,9 @@ class DetectCardTypeUseCase @Inject constructor() {
 
     // IDm byte[1] is a commonly used issuer hint for Japanese transit IC cards.
     // The system code remains 0x0003 for the interoperable transit card family.
-    private fun detectTransitIc(idmBytes: ByteArray): CardType {
-        if (idmBytes.size < 2) return CardType.SUICA
+    private fun detectTransitIc(idmBytes: ByteArray, availableSystemCodes: Set<Int>): CardType {
+        if (SUICA_SPECIFIC_SYSTEM_CODE in availableSystemCodes) return CardType.SUICA
+        if (idmBytes.size < 2) return CardType.ICOCA
         return when (idmBytes[1].toInt() and 0xFF) {
             0x07 -> CardType.ICOCA
             0x08 -> CardType.PASMO
@@ -26,7 +31,11 @@ class DetectCardTypeUseCase @Inject constructor() {
             0x23 -> CardType.SUGOCA
             0x24 -> CardType.NIMOCA
             0x25 -> CardType.HAYAKAKEN
-            else -> CardType.SUICA
+            else -> CardType.ICOCA
         }
+    }
+
+    private companion object {
+        const val SUICA_SPECIFIC_SYSTEM_CODE = 0x86A7
     }
 }

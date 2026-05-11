@@ -27,7 +27,8 @@ class ReadFeliCaUseCase @Inject constructor(
             val idmBytes = reader.getIdm()
             val idmHex = idmBytes.joinToString("") { "%02X".format(it) }
             val systemCode = reader.getSystemCode()
-            var cardType = detectCardType.invoke(systemCode, idmBytes)
+            val availableSystemCodes = runCatching { reader.requestSystemCodes() }.getOrDefault(emptySet())
+            var cardType = detectCardType.invoke(systemCode, idmBytes, availableSystemCodes)
 
             if (cardType == CardType.NANACO) {
                 cardType = probeNanacoOrEdy(reader)

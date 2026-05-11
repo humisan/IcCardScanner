@@ -21,6 +21,32 @@ class FeliCaReader(private val nfcF: NfcF) {
         return ((sc[0].toInt() and 0xFF) shl 8) or (sc[1].toInt() and 0xFF)
     }
 
+    fun requestSystemCodes(): Set<Int> {
+        val idm = getIdm()
+        val cmd = ByteArray(REQUEST_SYSTEM_CODE_FRAME_SIZE)
+        var pos = 0
+        cmd[pos++] = REQUEST_SYSTEM_CODE_FRAME_SIZE.toByte()
+        cmd[pos++] = REQUEST_SYSTEM_CODE_COMMAND
+        idm.copyInto(cmd, pos)
+
+        val response = nfcF.transceive(cmd)
+        if (response.size < MIN_REQUEST_SYSTEM_CODE_RESPONSE_SIZE) {
+            throw IOException("FeliCa system-code response too short: ${response.size}")
+        }
+        if (response[1] != REQUEST_SYSTEM_CODE_RESPONSE) {
+            throw IOException("Unexpected FeliCa system-code response: 0x${response[1].toHex()}")
+        }
+        val count = response[10].toInt() and 0xFF
+        val expectedSize = MIN_REQUEST_SYSTEM_CODE_RESPONSE_SIZE + count * 2
+        if (response.size < expectedSize) {
+            throw IOException("Truncated FeliCa system-code response: ${response.size}")
+        }
+        return (0 until count).mapTo(mutableSetOf()) { index ->
+            val offset = 11 + index * 2
+            ((response[offset].toInt() and 0xFF) shl 8) or (response[offset + 1].toInt() and 0xFF)
+        }
+    }
+
     /**
      * READ WITHOUT ENCRYPTION (command code 06).
      * serviceCode is encoded little-endian in the frame.
@@ -88,5 +114,9 @@ class FeliCaReader(private val nfcF: NfcF) {
         const val MIN_READ_RESPONSE_SIZE = 12
         const val MIN_SUCCESS_READ_RESPONSE_SIZE = 13
         const val READ_WITHOUT_ENCRYPTION_RESPONSE: Byte = 0x07
+        const val REQUEST_SYSTEM_CODE_FRAME_SIZE = 10
+        const val MIN_REQUEST_SYSTEM_CODE_RESPONSE_SIZE = 11
+        const val REQUEST_SYSTEM_CODE_COMMAND: Byte = 0x0C
+        const val REQUEST_SYSTEM_CODE_RESPONSE: Byte = 0x0D
     }
 }
