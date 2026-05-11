@@ -27,6 +27,12 @@ class FeliCaReader(private val nfcF: NfcF) {
      * blockIndices: 0-based block numbers to read.
      */
     fun readBlocks(serviceCode: Int, blockIndices: List<Int>): List<ByteArray> {
+        require(blockIndices.isNotEmpty()) { "blockIndices must not be empty" }
+        require(blockIndices.size <= MAX_BLOCKS_PER_READ) {
+            "block count must be $MAX_BLOCKS_PER_READ or less: ${blockIndices.size}"
+        }
+        require(blockIndices.all { it in 0..0xFF }) { "block index must be in 0..255" }
+
         val idm = getIdm()
         val blockCount = blockIndices.size
         val frameLen = 1 + 1 + 8 + 1 + 2 + 1 + blockCount * 2
@@ -48,10 +54,22 @@ class FeliCaReader(private val nfcF: NfcF) {
     }
 
     private fun parseReadResponse(resp: ByteArray): List<ByteArray> {
-        if (resp.size < 13) throw IOException("Response too short: ${resp.size}")
-        if (resp[1] != 0x07.toByte()) throw IOException("Unexpected code: 0x${resp[1].toInt().and(0xFF).toString(16)}")
-        if (resp[10] != 0x00.toByte()) throw IOException("FeliCa status flag 1: 0x${resp[10].toInt().and(0xFF).toString(16)}")
-        if (resp[11] != 0x00.toByte()) throw IOException("FeliCa status flag 2: ${resp[11]}")
+        if (resp.size < MIN_READ_RESPONSE_SIZE) {
+            throw IOException("FeliCa read response too short: ${resp.size}")
+        }
+        if (resp[1] != READ_WITHOUT_ENCRYPTION_RESPONSE) {
+            throw IOException("Unexpected FeliCa response code: 0x${resp[1].toHex()}")
+        }
+        val statusFlag1 = resp[10]
+        val statusFlag2 = resp[11]
+        if (statusFlag1 != 0x00.toByte() || statusFlag2 != 0x00.toByte()) {
+            throw IOException(
+                "FeliCa read failed: status1=0x${statusFlag1.toHex()}, status2=0x${statusFlag2.toHex()}"
+            )
+        }
+        if (resp.size < MIN_SUCCESS_READ_RESPONSE_SIZE) {
+            throw IOException("FeliCa read success response too short: ${resp.size}")
+        }
         val count = resp[12].toInt() and 0xFF
         val blocks = mutableListOf<ByteArray>()
         var offset = 13
@@ -61,5 +79,14 @@ class FeliCaReader(private val nfcF: NfcF) {
             offset += 16
         }
         return blocks
+    }
+
+    private fun Byte.toHex(): String = (toInt() and 0xFF).toString(16).padStart(2, '0')
+
+    private companion object {
+        const val MAX_BLOCKS_PER_READ = 4
+        const val MIN_READ_RESPONSE_SIZE = 12
+        const val MIN_SUCCESS_READ_RESPONSE_SIZE = 13
+        const val READ_WITHOUT_ENCRYPTION_RESPONSE: Byte = 0x07
     }
 }

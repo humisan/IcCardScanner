@@ -34,7 +34,7 @@ class ReadFeliCaUseCase @Inject constructor(
             }
 
             val transitBlocks = if (cardType.isTransitIc) {
-                reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, (0 until TRANSIT_HISTORY_BLOCK_COUNT).toList())
+                readTransitHistoryBlocks(reader)
             } else {
                 emptyList()
             }
@@ -103,6 +103,11 @@ class ReadFeliCaUseCase @Inject constructor(
         return ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
     }
 
+    private fun readTransitHistoryBlocks(reader: FeliCaReader): List<ByteArray> =
+        (0 until TRANSIT_HISTORY_BLOCK_COUNT)
+            .chunked(TRANSIT_HISTORY_READ_BATCH_SIZE)
+            .flatMap { blockIndices -> reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, blockIndices) }
+
     private fun probeNanacoOrEdy(reader: FeliCaReader): CardType = try {
         reader.readBlocks(NANACO_BALANCE_SERVICE_CODE, listOf(0))
         CardType.NANACO
@@ -118,6 +123,7 @@ class ReadFeliCaUseCase @Inject constructor(
     private companion object {
         const val TRANSIT_HISTORY_SERVICE_CODE = 0x090F
         const val TRANSIT_HISTORY_BLOCK_COUNT = 20
+        const val TRANSIT_HISTORY_READ_BATCH_SIZE = 4
         const val NANACO_BALANCE_SERVICE_CODE = 0x564F
         const val WAON_BALANCE_SERVICE_CODE = 0x6817
         const val EDY_BALANCE_SERVICE_CODE = 0x170F
