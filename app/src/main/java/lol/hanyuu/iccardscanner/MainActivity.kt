@@ -1,6 +1,5 @@
 package lol.hanyuu.iccardscanner
 
-import android.app.PendingIntent
 import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
@@ -31,26 +30,32 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+        // Handle NFC intent that launched this Activity cold (manifest filter)
+        handleNfcIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pending = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        // enableReaderMode uses a direct callback — no PendingIntent, avoids MIUI BAL block
+        nfcAdapter?.enableReaderMode(
+            this,
+            { tag -> mainViewModel.handleNfcTag(tag) },
+            NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK,
+            null
         )
-        nfcAdapter?.enableForegroundDispatch(this, pending, null, null)
     }
 
     override fun onPause() {
         super.onPause()
-        nfcAdapter?.disableForegroundDispatch(this)
+        nfcAdapter?.disableReaderMode(this)
     }
 
-    @Deprecated("Deprecated in Java")
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleNfcIntent(intent)
+    }
+
+    private fun handleNfcIntent(intent: Intent) {
         if (NfcAdapter.ACTION_TECH_DISCOVERED == intent.action ||
             NfcAdapter.ACTION_TAG_DISCOVERED == intent.action) {
             val tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)

@@ -1,6 +1,7 @@
 package lol.hanyuu.iccardscanner
 
 import android.nfc.Tag
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,10 +34,17 @@ class MainViewModel @Inject constructor(
                 val idm = readFeliCaUseCase(tag)
                 _scanState.value = ScanState.Success(idm)
             } catch (e: Exception) {
-                _scanState.value = ScanState.Error(e.message ?: "読み取りエラー")
+                Log.w(TAG, "Failed to read FeliCa tag", e)
+                _scanState.value = ScanState.Error(e.message ?: "IC card read failed")
             }
         }
     }
 
-    fun resetScanState() { _scanState.value = ScanState.Idle }
+    fun resetScanState() {
+        _scanState.value = ScanState.Idle
+    }
+
+    private companion object {
+        const val TAG = "MainViewModel"
+    }
 }

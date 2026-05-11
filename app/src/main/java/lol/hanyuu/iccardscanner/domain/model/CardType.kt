@@ -5,21 +5,21 @@ import lol.hanyuu.iccardscanner.R
 enum class CardType(
     val systemCode: Int,
     val displayName: String,
-    val drawableRes: Int,
+    val drawableRes: Int? = null,
 ) {
-    SUICA(0x0003, "Suica", R.drawable.card_suica),
-    PASMO(0x0003, "PASMO", R.drawable.card_pasmo),
-    ICOCA(0x0003, "ICOCA", R.drawable.card_icoca),
-    KITACA(0x0003, "Kitaca", R.drawable.card_suica),
-    TOICA(0x0003, "TOICA", R.drawable.card_suica),
-    MANACA(0x0003, "manaca", R.drawable.card_suica),
-    SUGOCA(0x0003, "SUGOCA", R.drawable.card_suica),
-    NIMOCA(0x0003, "nimoca", R.drawable.card_suica),
-    HAYAKAKEN(0x0003, "はやかけん", R.drawable.card_suica),
-    NANACO(0x88B4, "nanaco", R.drawable.card_nanaco),
-    WAON(0xFE00, "WAON", R.drawable.card_waon),
-    EDY(0x88B4, "楽天Edy", R.drawable.card_edy),
-    UNKNOWN(-1, "不明なカード", R.drawable.card_unknown);
+    SUICA(0x0003, "Suica", R.drawable.suica),
+    PASMO(0x0003, "PASMO", R.drawable.pasmo),
+    ICOCA(0x0003, "ICOCA", R.drawable.icoca),
+    KITACA(0x0003, "Kitaca", R.drawable.kitaca),
+    TOICA(0x0003, "TOICA", R.drawable.toica),
+    MANACA(0x0003, "manaca", R.drawable.manaca),
+    SUGOCA(0x0003, "SUGOCA", R.drawable.sugoca),
+    NIMOCA(0x0003, "nimoca", R.drawable.mimoca),
+    HAYAKAKEN(0x0003, "Hayakaken", R.drawable.hayasakaken),
+    NANACO(0x88B4, "nanaco", R.drawable.nanaco),
+    WAON(0xFE00, "WAON", R.drawable.waon),
+    EDY(0x88B4, "Rakuten Edy", R.drawable.rakuten_edy),
+    UNKNOWN(-1, "Unknown card", null);
 
     val isTransitIc: Boolean get() = systemCode == 0x0003
 }
