@@ -12,6 +12,7 @@ import lol.hanyuu.iccardscanner.domain.model.TransactionRecord
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.Locale
 
 @Composable
 fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
@@ -35,12 +36,12 @@ fun TransactionRow(record: TransactionRecord, modifier: Modifier = Modifier) {
         }
         Column(horizontalAlignment = Alignment.End) {
             val amountStr = when (record.processType) {
-                ProcessType.CHARGE -> "+¥${NumberFormat.getNumberInstance().format(record.amount)}"
-                else -> "-¥${NumberFormat.getNumberInstance().format(record.amount)}"
+                ProcessType.CHARGE -> "+¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(record.amount)}"
+                else -> "-¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(record.amount)}"
             }
             Text(text = amountStr, style = MaterialTheme.typography.bodyMedium)
             Text(
-                text = "残高 ¥${NumberFormat.getNumberInstance().format(record.balance)}",
+                text = "残高 ¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(record.balance)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )

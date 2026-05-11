@@ -26,7 +26,9 @@ import lol.hanyuu.iccardscanner.domain.model.TransactionRecord
 import lol.hanyuu.iccardscanner.ui.components.CardVisual
 import lol.hanyuu.iccardscanner.ui.components.TransactionRow
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 @Composable
@@ -214,5 +216,9 @@ private fun EmptyCardPlaceholder(modifier: Modifier = Modifier) {
     }
 }
 
+private val dateTimeFormatter = DateTimeFormatter
+    .ofPattern("yyyy/MM/dd HH:mm")
+    .withZone(ZoneId.of("Asia/Tokyo"))
+
 private fun formatDateTime(epochMillis: Long): String =
-    SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.JAPAN).format(Date(epochMillis))
+    dateTimeFormatter.format(Instant.ofEpochMilli(epochMillis))
