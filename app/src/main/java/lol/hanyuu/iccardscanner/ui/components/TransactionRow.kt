@@ -78,7 +78,7 @@ private fun formatAmount(record: TransactionRecord): String {
 }
 
 private fun stationSummary(context: android.content.Context, record: TransactionRecord): String? {
-    val area = record.details?.extractHex("area")
+    val area = record.details?.extractHex("area") ?: record.details?.extractHex("region")
     val from = record.entryStationCode?.let { StationNameResolver.resolve(context, area, it) }
     val to = record.exitStationCode?.let { StationNameResolver.resolve(context, area, it) }
     return when {
@@ -101,7 +101,10 @@ private fun String.extractValue(key: String): String? =
     split(';').firstOrNull { it.startsWith("$key=") }?.substringAfter('=')
 
 private fun String.extractHex(key: String): Int? =
-    extractValue(key)?.toIntOrNull(16)
+    extractValue(key)
+        ?.removePrefix("0x")
+        ?.removePrefix("0X")
+        ?.toIntOrNull(16)
 
 private fun formatYen(value: Int): String =
     "¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(value)}"

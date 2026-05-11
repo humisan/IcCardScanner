@@ -6,6 +6,7 @@ import android.util.Log
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import lol.hanyuu.iccardscanner.BuildConfig
 import lol.hanyuu.iccardscanner.data.db.entity.CardEntity
 import lol.hanyuu.iccardscanner.data.db.entity.ScanRecordEntity
 import lol.hanyuu.iccardscanner.data.nfc.FeliCaReader
@@ -25,6 +26,11 @@ class ReadFeliCaUseCase @Inject constructor(
         val reader = FeliCaReader(nfcF)
         try {
             reader.connect()
+            Log.d(
+                TAG,
+                "build=${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE}) " +
+                    "historyTarget=$TRANSIT_HISTORY_BLOCK_COUNT readerMaxBlocks=${reader.maxBlocksPerRead}"
+            )
             val idmBytes = reader.getIdm()
             val idmHex = idmBytes.joinToString("") { "%02X".format(it) }
             val tagSystemCode = reader.getSystemCode()
@@ -131,6 +137,7 @@ class ReadFeliCaUseCase @Inject constructor(
                 .getOrNull() ?: break
             blocks += block
         }
+        Log.d(TAG, "historyRead requested=$TRANSIT_HISTORY_BLOCK_COUNT read=${blocks.size}")
         return blocks
     }
 
