@@ -2,6 +2,7 @@ package lol.hanyuu.iccardscanner.domain.usecase
 
 import android.nfc.Tag
 import android.nfc.tech.NfcF
+import android.util.Log
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,24 +27,28 @@ class ReadFeliCaUseCase @Inject constructor(
             reader.connect()
             val idmBytes = reader.getIdm()
             val idmHex = idmBytes.joinToString("") { "%02X".format(it) }
-            val systemCode = reader.getSystemCode()
-            val availableSystemCodes = runCatching { reader.requestSystemCodes() }.getOrDefault(emptySet())
+            val tagSystemCode = reader.getSystemCode()
+            val cardLogId = idmHex.takeLast(4).padStart(idmHex.length, '*')
+            Log.d(TAG, "card=$cardLogId systemCode=0x${tagSystemCode.toString(16)}")
+            val availableSystemCodes = runCatching { reader.requestSystemCodes() }.getOrElse { e ->
+                Log.w(TAG, "requestSystemCodes failed: ${e.message}")
+                emptySet()
+            }
+            Log.d(TAG, "availableSystemCodes=$availableSystemCodes")
+            val systemCode = resolveSystemCode(tagSystemCode, availableSystemCodes)
             var cardType = detectCardType.invoke(systemCode, idmBytes, availableSystemCodes)
+            Log.d(TAG, "detected cardType=$cardType")
 
             if (cardType == CardType.NANACO) {
                 cardType = probeNanacoOrEdy(reader)
+                Log.d(TAG, "nanaco/edy probe result=$cardType")
             }
 
-            val transitBlocks = if (cardType.isTransitIc) {
-                readTransitHistoryBlocks(reader)
-            } else {
-                emptyList()
-            }
-            val balance = if (cardType.isTransitIc) {
-                transitBlocks.firstOrNull()?.let(::parseStoredValueBalance)
-                    ?: throw IOException("Transit IC history block is empty")
-            } else {
-                readBalance(reader, cardType)
+            // Read balance first (1 transceive) so DB save succeeds even if history read fails
+            val balance = readBalance(reader, cardType)
+            Log.d(TAG, "balance=$balance")
+            if (cardType == CardType.UNKNOWN && balance < 0) {
+                throw IOException("Unsupported or unstable FeliCa system code: 0x${tagSystemCode.toString(16)}")
             }
             val now = System.currentTimeMillis()
 
@@ -54,7 +59,7 @@ class ReadFeliCaUseCase @Inject constructor(
                     type = cardType,
                     systemCode = systemCode,
                     nickname = existingCard?.nickname ?: cardType.displayName,
-                    lastBalance = balance,
+                    lastBalance = if (balance >= 0) balance else existingCard?.lastBalance ?: -1,
                     lastScannedAt = now
                 )
             )
@@ -62,9 +67,17 @@ class ReadFeliCaUseCase @Inject constructor(
                 ScanRecordEntity(cardIdm = idmHex, scannedAt = now, balance = balance)
             )
 
+            // History is best-effort: tag may be lost partway through multi-block reads
             if (cardType.isTransitIc) {
-                val records = parseHistory.invoke(idmHex, transitBlocks)
-                historyRepository.insertTransactionsIgnoreConflicts(records)
+                try {
+                    val transitBlocks = readTransitHistoryBlocks(reader)
+                    Log.d(TAG, "transitBlocks.size=${transitBlocks.size}")
+                    val records = parseHistory.invoke(idmHex, transitBlocks)
+                    historyRepository.replaceTransactions(idmHex, records)
+                    Log.d(TAG, "saved ${records.size} history records")
+                } catch (e: Exception) {
+                    Log.w(TAG, "History read failed (non-fatal): ${e.message}")
+                }
             }
 
             idmHex
@@ -74,19 +87,23 @@ class ReadFeliCaUseCase @Inject constructor(
     }
 
     private fun readBalance(reader: FeliCaReader, cardType: CardType): Int = try {
-        when (cardType) {
-            CardType.NANACO -> {
+        when {
+            cardType.isTransitIc -> {
+                val block = reader.readBlocks(TRANSIT_BALANCE_SERVICE_CODE, listOf(0)).first()
+                ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
+            }
+            cardType == CardType.NANACO -> {
                 val block = reader.readBlocks(NANACO_BALANCE_SERVICE_CODE, listOf(0)).first()
                 ((block[3].toInt() and 0xFF)) or
                     ((block[2].toInt() and 0xFF) shl 8) or
                     ((block[1].toInt() and 0xFF) shl 16) or
                     ((block[0].toInt() and 0xFF) shl 24)
             }
-            CardType.WAON -> {
+            cardType == CardType.WAON -> {
                 val block = reader.readBlocks(WAON_BALANCE_SERVICE_CODE, listOf(0)).first()
                 ((block[1].toInt() and 0xFF) shl 8) or (block[0].toInt() and 0xFF)
             }
-            CardType.EDY -> {
+            cardType == CardType.EDY -> {
                 val block = reader.readBlocks(EDY_BALANCE_SERVICE_CODE, listOf(0)).first()
                 ((block[3].toInt() and 0xFF)) or
                     ((block[2].toInt() and 0xFF) shl 8) or
@@ -99,15 +116,16 @@ class ReadFeliCaUseCase @Inject constructor(
         -1
     }
 
-    private fun parseStoredValueBalance(block: ByteArray): Int {
-        if (block.size < 12) throw IOException("Transit IC block is too short: ${block.size}")
-        return ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
-    }
-
     private fun readTransitHistoryBlocks(reader: FeliCaReader): List<ByteArray> =
         (0 until TRANSIT_HISTORY_BLOCK_COUNT)
             .chunked(TRANSIT_HISTORY_READ_BATCH_SIZE)
             .flatMap { blockIndices -> reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, blockIndices) }
+
+    private fun resolveSystemCode(tagSystemCode: Int, availableSystemCodes: Set<Int>): Int {
+        if (tagSystemCode != 0) return tagSystemCode
+        if (TRANSIT_SYSTEM_CODE in availableSystemCodes) return TRANSIT_SYSTEM_CODE
+        return availableSystemCodes.firstOrNull() ?: tagSystemCode
+    }
 
     private fun probeNanacoOrEdy(reader: FeliCaReader): CardType = try {
         reader.readBlocks(NANACO_BALANCE_SERVICE_CODE, listOf(0))
@@ -122,8 +140,11 @@ class ReadFeliCaUseCase @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "ReadFeliCa"
+        const val TRANSIT_SYSTEM_CODE = 0x0003
+        const val TRANSIT_BALANCE_SERVICE_CODE = 0x008B
         const val TRANSIT_HISTORY_SERVICE_CODE = 0x090F
-        const val TRANSIT_HISTORY_BLOCK_COUNT = 20
+        const val TRANSIT_HISTORY_BLOCK_COUNT = 10   // reduced from 20 to minimize tag-lost risk
         const val TRANSIT_HISTORY_READ_BATCH_SIZE = 4
         const val NANACO_BALANCE_SERVICE_CODE = 0x564F
         const val WAON_BALANCE_SERVICE_CODE = 0x6817

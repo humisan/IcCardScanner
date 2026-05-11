@@ -21,6 +21,9 @@ class HistoryRepository @Inject constructor(
     suspend fun insertTransactionsIgnoreConflicts(records: List<TransactionRecordEntity>) =
         transactionRecordDao.insertIgnoreConflict(records)
 
+    suspend fun replaceTransactions(cardIdm: String, records: List<TransactionRecordEntity>) =
+        transactionRecordDao.replaceByCard(cardIdm, records)
+
     private fun TransactionRecordEntity.toDomain() = TransactionRecord(
         id = id,
         cardIdm = cardIdm,

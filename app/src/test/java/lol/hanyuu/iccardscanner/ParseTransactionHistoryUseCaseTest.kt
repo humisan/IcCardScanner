@@ -31,7 +31,7 @@ class ParseTransactionHistoryUseCaseTest {
     @Test
     fun `computes amount from next older balance`() {
         val newest = ByteArray(16).apply {
-            this[1] = 0x02
+            this[1] = 0x01
             this[4] = 0x30
             this[5] = 0x70
             this[10] = 0x20
@@ -49,6 +49,20 @@ class ParseTransactionHistoryUseCaseTest {
 
         assertEquals(2, records.size)
         assertEquals(200, records[0].amount)
+    }
+
+    @Test
+    fun `process code 0x02 is charge`() {
+        val block = ByteArray(16).apply {
+            this[1] = 0x02
+            this[4] = 0x30
+            this[5] = 0x6F
+        }
+
+        val records = useCase.invoke(testIdm, listOf(block))
+
+        assertEquals(1, records.size)
+        assertEquals(ProcessType.CHARGE, records[0].processType)
     }
 
     @Test

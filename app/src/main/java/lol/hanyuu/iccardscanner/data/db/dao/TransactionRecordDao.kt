@@ -14,4 +14,13 @@ interface TransactionRecordDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIgnoreConflict(records: List<TransactionRecordEntity>)
+
+    @Query("DELETE FROM transaction_records WHERE cardIdm = :idm")
+    suspend fun deleteByCard(idm: String)
+
+    @Transaction
+    suspend fun replaceByCard(idm: String, records: List<TransactionRecordEntity>) {
+        deleteByCard(idm)
+        insertIgnoreConflict(records)
+    }
 }

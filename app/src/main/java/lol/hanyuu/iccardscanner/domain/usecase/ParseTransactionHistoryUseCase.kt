@@ -37,9 +37,9 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
 
         val processType = when (processCode) {
             0x01 -> ProcessType.ENTRY
-            0x02 -> ProcessType.EXIT
+            0x02 -> ProcessType.CHARGE
             0x0F, 0x1F -> ProcessType.ENTRY
-            0x23 -> ProcessType.PURCHASE
+            0x03, 0x23 -> ProcessType.PURCHASE
             0x46 -> ProcessType.CHARGE
             else -> ProcessType.OTHER
         }
@@ -49,13 +49,16 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         val exitLine = block[8].toInt() and 0xFF
         val exitStation = block[9].toInt() and 0xFF
         val balance = ((block[11].toInt() and 0xFF) shl 8) or (block[10].toInt() and 0xFF)
+        val region = block[15].toInt() and 0xFF
+        val sequence = ((block[13].toInt() and 0xFF) shl 8) or (block[12].toInt() and 0xFF)
 
         return ParsedTransitBlock(
             transactionDate = transactionDate,
             processType = processType,
             balance = balance,
             entryStationCode = encodeStation(entryLine, entryStation),
-            exitStationCode = encodeStation(exitLine, exitStation)
+            exitStationCode = encodeStation(exitLine, exitStation),
+            details = buildDetails(terminalType, processCode, entryLine, entryStation, exitLine, exitStation, region, sequence)
         )
     }
 
@@ -68,7 +71,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
             balance = balance,
             entryStationCode = entryStationCode,
             exitStationCode = exitStationCode,
-            details = null
+            details = details
         )
 
     private fun GregorianCalendar.runCatchingTimeInMillis(): Long? =
@@ -79,11 +82,31 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         return (line shl 8) or station
     }
 
+    private fun buildDetails(
+        terminalType: Int,
+        processCode: Int,
+        entryLine: Int,
+        entryStation: Int,
+        exitLine: Int,
+        exitStation: Int,
+        region: Int,
+        sequence: Int
+    ): String =
+        "terminal=0x${terminalType.toHex()}, process=0x${processCode.toHex()}, " +
+            "from=${entryLine.toCode()}-${entryStation.toCode()}, " +
+            "to=${exitLine.toCode()}-${exitStation.toCode()}, " +
+            "region=0x${region.toHex()}, sequence=$sequence"
+
+    private fun Int.toHex(): String = toString(16).padStart(2, '0')
+
+    private fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()
+
     private data class ParsedTransitBlock(
         val transactionDate: Long,
         val processType: ProcessType,
         val balance: Int,
         val entryStationCode: Int?,
-        val exitStationCode: Int?
+        val exitStationCode: Int?,
+        val details: String
     )
 }

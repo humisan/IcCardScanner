@@ -1,5 +1,8 @@
 package lol.hanyuu.iccardscanner.ui.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +61,7 @@ fun CardVisual(
     modifier: Modifier = Modifier
 ) {
     val aspectRatio = 1.586f
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -65,12 +71,14 @@ fun CardVisual(
     ) {
         val drawableRes = cardType.drawableRes
         if (drawableRes != null) {
+            val transparentImage = remember(drawableRes) {
+                decodeWithTransparentBackground(context, drawableRes)
+            }
             Image(
-                painter = painterResource(id = drawableRes),
+                bitmap = transparentImage.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                alpha = 0.85f
+                contentScale = ContentScale.Fit
             )
         }
         Column(
@@ -93,4 +101,34 @@ fun CardVisual(
             )
         }
     }
+}
+
+private fun decodeWithTransparentBackground(context: Context, drawableRes: Int): Bitmap {
+    val source = BitmapFactory.decodeResource(context.resources, drawableRes)
+        ?: error("Unable to decode card image resource: $drawableRes")
+    val bitmap = source.copy(Bitmap.Config.ARGB_8888, true)
+    if (source !== bitmap) source.recycle()
+
+    val width = bitmap.width
+    val height = bitmap.height
+    val pixels = IntArray(width * height)
+    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+    for (index in pixels.indices) {
+        val color = pixels[index]
+        val alpha = color ushr 24
+        val red = (color ushr 16) and 0xFF
+        val green = (color ushr 8) and 0xFF
+        val blue = color and 0xFF
+        if (alpha > 0 && isBackgroundLike(red, green, blue)) {
+            pixels[index] = color and 0x00FFFFFF
+        }
+    }
+    bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+    return bitmap
+}
+
+private fun isBackgroundLike(red: Int, green: Int, blue: Int): Boolean {
+    val max = maxOf(red, green, blue)
+    val min = minOf(red, green, blue)
+    return max >= 238 && max - min <= 18
 }
