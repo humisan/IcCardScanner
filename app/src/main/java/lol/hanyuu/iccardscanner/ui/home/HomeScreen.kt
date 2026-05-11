@@ -2,10 +2,10 @@ package lol.hanyuu.iccardscanner.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.AccountBox
@@ -63,98 +63,108 @@ fun HomeScreen(
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
         ) {
-            Spacer(Modifier.height(16.dp))
+            item { Spacer(Modifier.height(16.dp)) }
 
-            if (cards.isEmpty()) {
-                EmptyCardPlaceholder(modifier = Modifier.padding(horizontal = 24.dp))
-            } else {
-                HorizontalPager(
-                    state = pagerState,
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    pageSpacing = 12.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) { page ->
-                    val card = cards[page]
-                    CardVisual(
-                        cardType = card.type,
-                        nickname = card.nickname,
+            item {
+                if (cards.isEmpty()) {
+                    EmptyCardPlaceholder(modifier = Modifier.padding(horizontal = 24.dp))
+                } else {
+                    HorizontalPager(
+                        state = pagerState,
+                        contentPadding = PaddingValues(horizontal = 24.dp),
+                        pageSpacing = 12.dp,
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    ) { page ->
+                        val card = cards[page]
+                        CardVisual(
+                            cardType = card.type,
+                            nickname = card.nickname,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            item { Spacer(Modifier.height(24.dp)) }
 
-            val currentCard = cards.getOrNull(selectedIndex)
-            BalanceSection(card = currentCard, modifier = Modifier.padding(horizontal = 24.dp))
-
-            Spacer(Modifier.height(8.dp))
-
-            NfcGuidance(
-                isLoading = scanState is ScanState.Loading,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { currentCard?.let { onNavigateToHistory(it.idm) } },
-                    modifier = Modifier.weight(1f),
-                    enabled = currentCard != null
-                ) {
-                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("利用履歴")
-                }
-                OutlinedButton(
-                    onClick = { currentCard?.let { onNavigateToDetail(it.idm) } },
-                    modifier = Modifier.weight(1f),
-                    enabled = currentCard != null
-                ) {
-                    Icon(Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("カード詳細")
-                }
-                OutlinedButton(
-                    onClick = onNavigateToSettings,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("設定")
-                }
+            item {
+                val currentCard = cards.getOrNull(selectedIndex)
+                BalanceSection(card = currentCard, modifier = Modifier.padding(horizontal = 24.dp))
             }
 
-            Spacer(Modifier.height(24.dp))
+            item { Spacer(Modifier.height(8.dp)) }
 
-            if (recentTransactions.isNotEmpty()) {
-                Text(
-                    "最近の利用",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+            item {
+                NfcGuidance(
+                    isLoading = scanState is ScanState.Loading,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                Spacer(Modifier.height(8.dp))
-                recentTransactions.forEach { record ->
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
+
+            item {
+                val currentCard = cards.getOrNull(selectedIndex)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { currentCard?.let { onNavigateToHistory(it.idm) } },
+                        modifier = Modifier.weight(1f),
+                        enabled = currentCard != null
+                    ) {
+                        Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("利用履歴")
+                    }
+                    OutlinedButton(
+                        onClick = { currentCard?.let { onNavigateToDetail(it.idm) } },
+                        modifier = Modifier.weight(1f),
+                        enabled = currentCard != null
+                    ) {
+                        Icon(Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("カード詳細")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("設定")
+                    }
+                }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
+
+            if (recentTransactions.isNotEmpty()) {
+                item {
+                    Text(
+                        "最近の利用",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(recentTransactions) { record ->
                     TransactionRow(record = record, modifier = Modifier.padding(horizontal = 24.dp))
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }

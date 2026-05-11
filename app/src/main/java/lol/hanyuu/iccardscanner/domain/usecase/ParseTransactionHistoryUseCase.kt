@@ -35,9 +35,10 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
 
         val processType = when (processCode) {
             0x01 -> ProcessType.ENTRY
-            0x02 -> ProcessType.CHARGE
+            0x02 -> ProcessType.EXIT
             0x0F, 0x1F -> ProcessType.ENTRY
             0x23 -> ProcessType.PURCHASE
+            0x46 -> ProcessType.CHARGE
             else -> ProcessType.OTHER
         }
 

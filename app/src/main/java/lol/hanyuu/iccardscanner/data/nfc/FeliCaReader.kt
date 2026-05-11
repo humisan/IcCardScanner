@@ -50,7 +50,8 @@ class FeliCaReader(private val nfcF: NfcF) {
     private fun parseReadResponse(resp: ByteArray): List<ByteArray> {
         if (resp.size < 13) throw IOException("Response too short: ${resp.size}")
         if (resp[1] != 0x07.toByte()) throw IOException("Unexpected code: 0x${resp[1].toInt().and(0xFF).toString(16)}")
-        if (resp[10] != 0x00.toByte()) throw IOException("Status error: 0x${resp[10].toInt().and(0xFF).toString(16)}")
+        if (resp[10] != 0x00.toByte()) throw IOException("FeliCa status flag 1: 0x${resp[10].toInt().and(0xFF).toString(16)}")
+        if (resp[11] != 0x00.toByte()) throw IOException("FeliCa status flag 2: ${resp[11]}")
         val count = resp[12].toInt() and 0xFF
         val blocks = mutableListOf<ByteArray>()
         var offset = 13
