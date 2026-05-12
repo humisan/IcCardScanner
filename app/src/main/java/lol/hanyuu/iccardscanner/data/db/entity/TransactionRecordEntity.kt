@@ -19,7 +19,8 @@ import lol.hanyuu.iccardscanner.domain.model.ProcessType
     indices = [
         Index("cardIdm"),
         Index(
-            value = ["cardIdm", "transactionDate", "processType", "amount"],
+            name = "index_transaction_records_full_history_key",
+            value = ["cardIdm", "transactionDate", "processType", "amount", "balance", "entryStationCode", "exitStationCode"],
             unique = true
         )
     ]

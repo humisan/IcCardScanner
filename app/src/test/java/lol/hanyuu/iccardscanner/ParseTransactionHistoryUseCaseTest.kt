@@ -53,6 +53,49 @@ class ParseTransactionHistoryUseCaseTest {
     }
 
     @Test
+    fun `keeps same-day same-fare reverse trips as separate records`() {
+        val newest = ByteArray(16).apply {
+            this[1] = 0x01
+            this[4] = 0x34
+            this[5] = 0xAC.toByte()
+            this[6] = 0x8A.toByte()
+            this[7] = 0x9C.toByte()
+            this[8] = 0x8B.toByte()
+            this[9] = 0xB0.toByte()
+            this[10] = 0x76
+            this[11] = 0x00
+        }
+        val olderReverseTrip = ByteArray(16).apply {
+            this[1] = 0x01
+            this[4] = 0x34
+            this[5] = 0xAC.toByte()
+            this[6] = 0x8B.toByte()
+            this[7] = 0xB0.toByte()
+            this[8] = 0x8A.toByte()
+            this[9] = 0x9C.toByte()
+            this[10] = 0x7A
+            this[11] = 0x01
+        }
+        val oldest = ByteArray(16).apply {
+            this[1] = 0x01
+            this[4] = 0x34
+            this[5] = 0xAB.toByte()
+            this[10] = 0x7E
+            this[11] = 0x02
+        }
+
+        val records = useCase.invoke(testIdm, listOf(newest, olderReverseTrip, oldest))
+
+        assertEquals(3, records.size)
+        assertEquals(260, records[0].amount)
+        assertEquals(260, records[1].amount)
+        assertEquals(0x8A9C, records[0].entryStationCode)
+        assertEquals(0x8BB0, records[0].exitStationCode)
+        assertEquals(0x8BB0, records[1].entryStationCode)
+        assertEquals(0x8A9C, records[1].exitStationCode)
+    }
+
+    @Test
     fun `process code 0x02 is charge`() {
         val block = ByteArray(16).apply {
             this[1] = 0x02
