@@ -27,7 +27,7 @@ sealed class UpdateState {
     data object Checking : UpdateState()
     data class Available(val versionCode: Int, val versionName: String, val downloadUrl: String) : UpdateState()
     data class Downloading(val progress: Float) : UpdateState()
-    data class ReadyToInstall(val file: File) : UpdateState()
+    data class ReadyToInstall(val file: File, val autoLaunch: Boolean) : UpdateState()
     data class InstallPermissionRequired(val file: File) : UpdateState()
     data class Error(val message: String) : UpdateState()
 }
@@ -60,7 +60,9 @@ class HomeViewModel @Inject constructor(
     private var lastUpdateCheckStartedAt = 0L
 
     init {
-        checkForUpdate(force = true)
+        if (!restorePendingUpdate()) {
+            checkForUpdate(force = true)
+        }
     }
 
     fun selectCard(index: Int) { _selectedIndex.value = index }
@@ -78,7 +80,7 @@ class HomeViewModel @Inject constructor(
     fun retryInstallAfterPermission() {
         val state = _updateState.value
         if (state is UpdateState.InstallPermissionRequired) {
-            _updateState.value = UpdateState.ReadyToInstall(state.file)
+            _updateState.value = UpdateState.ReadyToInstall(state.file, autoLaunch = true)
         }
     }
 
@@ -110,14 +112,15 @@ class HomeViewModel @Inject constructor(
             if (info != null) {
                 Log.d(TAG, "Auto update found: version=${info.versionName} asset=${info.assetName} size=${info.assetSize}")
                 _updateState.value = UpdateState.Available(info.versionCode, info.versionName, info.downloadUrl)
-                downloadUpdate(info.downloadUrl)
+                downloadUpdate(info.versionCode, info.downloadUrl)
             } else {
+                clearPendingUpdate()
                 _updateState.value = UpdateState.Idle
             }
         }
     }
 
-    fun downloadUpdate(url: String) {
+    fun downloadUpdate(versionCode: Int, url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             _updateState.value = UpdateState.Downloading(0f)
             try {
@@ -131,8 +134,8 @@ class HomeViewModel @Inject constructor(
                     throw IllegalStateException("APKダウンロードに失敗しました: HTTP $httpCode")
                 }
                 val total = conn.contentLengthLong
-                val tmpFile = File(context.cacheDir, "update.apk.download")
-                val file = File(context.cacheDir, "update.apk")
+                val tmpFile = File(context.cacheDir, "$UPDATE_APK_FILE_NAME.download")
+                val file = File(context.cacheDir, UPDATE_APK_FILE_NAME)
                 tmpFile.delete()
                 file.delete()
                 var downloaded = 0L
@@ -163,7 +166,8 @@ class HomeViewModel @Inject constructor(
                     throw IllegalStateException("APKファイルの保存に失敗しました")
                 }
                 Log.d(TAG, "APK downloaded: ${file.absolutePath} bytes=$downloaded")
-                _updateState.value = UpdateState.ReadyToInstall(file)
+                savePendingUpdate(versionCode, file)
+                _updateState.value = UpdateState.ReadyToInstall(file, autoLaunch = true)
             } catch (e: Exception) {
                 Log.e(TAG, "APK download failed", e)
                 _updateState.value = UpdateState.Error(e.message ?: "ダウンロードに失敗しました")
@@ -171,8 +175,41 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun restorePendingUpdate(): Boolean {
+        val prefs = updatePrefs()
+        val versionCode = prefs.getInt(KEY_PENDING_VERSION_CODE, -1)
+        val fileName = prefs.getString(KEY_PENDING_FILE_NAME, UPDATE_APK_FILE_NAME) ?: UPDATE_APK_FILE_NAME
+        val file = File(context.cacheDir, fileName)
+        if (versionCode > BuildConfig.VERSION_CODE && file.isFile && file.length() > 0L) {
+            Log.d(TAG, "restore pending update: version=$versionCode file=${file.absolutePath} bytes=${file.length()}")
+            _updateState.value = UpdateState.ReadyToInstall(file, autoLaunch = false)
+            return true
+        }
+        clearPendingUpdate()
+        return false
+    }
+
+    private fun savePendingUpdate(versionCode: Int, file: File) {
+        updatePrefs()
+            .edit()
+            .putInt(KEY_PENDING_VERSION_CODE, versionCode)
+            .putString(KEY_PENDING_FILE_NAME, file.name)
+            .apply()
+    }
+
+    private fun clearPendingUpdate() {
+        updatePrefs().edit().clear().apply()
+    }
+
+    private fun updatePrefs() =
+        context.getSharedPreferences(PREFS_UPDATE, Context.MODE_PRIVATE)
+
     private companion object {
         const val TAG = "HomeViewModel"
         const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+        const val UPDATE_APK_FILE_NAME = "update.apk"
+        const val PREFS_UPDATE = "github_update"
+        const val KEY_PENDING_VERSION_CODE = "pending_version_code"
+        const val KEY_PENDING_FILE_NAME = "pending_file_name"
     }
 }

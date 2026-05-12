@@ -75,8 +75,9 @@ fun HomeScreen(
     }
 
     LaunchedEffect(updateState) {
-        if (updateState is UpdateState.ReadyToInstall) {
-            val file = (updateState as UpdateState.ReadyToInstall).file
+        val state = updateState
+        if (state is UpdateState.ReadyToInstall && state.autoLaunch) {
+            val file = state.file
             if (canRequestPackageInstalls(context)) {
                 runCatching { context.startActivity(createInstallIntent(context, file)) }
                     .onFailure { e ->
@@ -238,7 +239,7 @@ fun HomeScreen(
 @Composable
 private fun UpdateBanner(
     state: UpdateState,
-    onDownload: (String) -> Unit,
+    onDownload: (Int, String) -> Unit,
     onOpenInstallPermission: () -> Unit,
     onInstall: (java.io.File) -> Unit,
     onDismissError: () -> Unit
@@ -275,7 +276,7 @@ private fun UpdateBanner(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                    Button(onClick = { onDownload(state.downloadUrl) }) {
+                    Button(onClick = { onDownload(state.versionCode, state.downloadUrl) }) {
                         Text("更新")
                     }
                 }
