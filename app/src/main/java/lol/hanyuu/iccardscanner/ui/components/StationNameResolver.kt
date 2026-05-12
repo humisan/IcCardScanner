@@ -17,29 +17,24 @@ object StationNameResolver {
     @Volatile
     private var cachedStations: Map<Int, StationLabel>? = null
 
-    fun resolve(context: Context, rawAreaCode: Int?, stationCode: Int): StationLabel {
+    fun resolve(context: Context, rawAreaCode: Int?, stationCode: Int): StationLabel? {
         val line = (stationCode ushr 8) and 0xFF
         val station = stationCode and 0xFF
-        val fallback = StationLabel(
-            code = "${line.toCode()}-${station.toCode()}",
-            name = "駅コード ${line.toCode()}-${station.toCode()}",
-            line = "不明",
-            company = "不明"
-        )
         val stations = loadStations(context)
-        val normalizedAreas = normalizeAreaCodes(rawAreaCode)
-        for (area in normalizedAreas) {
+        for (area in normalizeAreaCodes(rawAreaCode)) {
             stations[stationKey(area, line, station)]?.let { return it }
         }
-        return stations.values.firstOrNull { it.code == fallback.code } ?: fallback
+        return null
     }
 
+    // JR lines are classified under area 0 regardless of geographic region, so every
+    // regional lookup must also fall back to area 0.
     private fun normalizeAreaCodes(rawAreaCode: Int?): List<Int> = when (rawAreaCode) {
         0x00 -> listOf(0)
-        0x40 -> listOf(1)
-        0x80 -> listOf(2)
-        0xA0 -> listOf(2, 3)
-        0xC0 -> listOf(3)
+        0x40 -> listOf(1, 0)
+        0x80 -> listOf(2, 0)
+        0xA0 -> listOf(2, 3, 0)
+        0xC0 -> listOf(3, 0)
         null -> listOf(0, 1, 2, 3)
         else -> listOf(rawAreaCode and 0x03, 0, 1, 2, 3).distinct()
     }
@@ -78,4 +73,4 @@ object StationNameResolver {
         (area shl 16) or (line shl 8) or station
 }
 
-private fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()
+internal fun Int.toCode(): String = toString(16).padStart(2, '0').uppercase()

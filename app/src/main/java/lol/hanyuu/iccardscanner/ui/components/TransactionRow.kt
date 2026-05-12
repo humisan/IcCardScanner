@@ -78,15 +78,33 @@ private fun formatAmount(record: TransactionRecord): String {
 }
 
 private fun stationSummary(context: android.content.Context, record: TransactionRecord): String? {
+    // Bytes 6-9 in PURCHASE/CHARGE blocks hold merchant/terminal codes, not station codes
+    if (record.processType == ProcessType.PURCHASE || record.processType == ProcessType.CHARGE) return null
+
     val area = record.details?.extractHex("area") ?: record.details?.extractHex("region")
     val from = record.entryStationCode?.let { StationNameResolver.resolve(context, area, it) }
     val to = record.exitStationCode?.let { StationNameResolver.resolve(context, area, it) }
+
+    val fromCode = record.entryStationCode?.rawCode()
+    val toCode = record.exitStationCode?.rawCode()
+
     return when {
-        from != null && to != null -> "入場 ${from.displayName} → 退場 ${to.displayName}（${from.code} → ${to.code}）"
-        from != null -> "入場 ${from.displayName}（${from.code}）"
-        to != null -> "退場 ${to.displayName}（${to.code}）"
+        from != null && to != null -> "${from.name}（${from.line}）→ ${to.name}（${to.line}）"
+        from != null && toCode != null -> "${from.name}（${from.line}）→ $toCode"
+        from != null -> "${from.name}（${from.line}）"
+        fromCode != null && to != null -> "$fromCode → ${to.name}（${to.line}）"
+        to != null -> "${to.name}（${to.line}）"
+        fromCode != null && toCode != null -> "$fromCode → $toCode"
+        fromCode != null -> fromCode
+        toCode != null -> toCode
         else -> null
     }
+}
+
+private fun Int.rawCode(): String {
+    val line = (this ushr 8) and 0xFF
+    val station = this and 0xFF
+    return "${line.toCode()}-${station.toCode()}"
 }
 
 private fun detailsSummary(record: TransactionRecord): String? {
