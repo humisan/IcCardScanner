@@ -489,10 +489,12 @@ private fun createInstallPermissionIntent(context: android.content.Context): Int
         }
     }
 
+@Suppress("DEPRECATION")
 private fun createInstallIntent(context: android.content.Context, file: java.io.File): Intent {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    return Intent(Intent.ACTION_VIEW).apply {
+    return Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
         setDataAndType(uri, "application/vnd.android.package-archive")
+        putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
