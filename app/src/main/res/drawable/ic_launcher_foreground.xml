@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Card body (white rounded rectangle, fits within 66dp safe zone) -->
+    <path
+        android:pathData="M32,37 L76,37 Q81,37 81,42 L81,66 Q81,71 76,71 L32,71 Q27,71 27,66 L27,42 Q27,37 32,37 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Chip body (gold) -->
+    <path
+        android:pathData="M33,44 L47,44 Q49,44 49,46 L49,60 Q49,62 47,62 L33,62 Q31,62 31,60 L31,46 Q31,44 33,44 Z"
+        android:fillColor="#F2C840" />
+    <!-- Chip contact lines -->
+    <path
+        android:pathData="M31,49 L49,49 M31,53 L49,53 M31,57 L49,57"
+        android:strokeColor="#C8A020"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M36,44 L36,62 M40,44 L40,62 M44,44 L44,62"
+        android:strokeColor="#C8A020"
+        android:strokeWidth="0.8"
+        android:fillColor="#00000000" />
+
+    <!-- NFC dot (filled circle at wave origin) -->
+    <path
+        android:pathData="M60.5,54 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0"
+        android:fillColor="#1A5E3B" />
+
+    <!-- NFC arc 1 (inner) -->
+    <path
+        android:pathData="M63,49 C73,49 73,59 63,59"
+        android:strokeColor="#1A5E3B"
+        android:strokeWidth="3.5"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round" />
+
+    <!-- NFC arc 2 (middle) -->
+    <path
+        android:pathData="M63,45 C77,45 77,63 63,63"
+        android:strokeColor="#1A5E3B"
+        android:strokeWidth="3.5"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round" />
+
+    <!-- NFC arc 3 (outer) -->
+    <path
+        android:pathData="M63,41 C81,41 81,67 63,67"
+        android:strokeColor="#1A5E3B"
+        android:strokeWidth="3.5"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round" />
+</vector>
