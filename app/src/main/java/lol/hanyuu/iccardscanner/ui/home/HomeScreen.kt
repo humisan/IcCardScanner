@@ -1,6 +1,9 @@
 package lol.hanyuu.iccardscanner.ui.home
 
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,7 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import lol.hanyuu.iccardscanner.ScanState
 import lol.hanyuu.iccardscanner.domain.model.Card
 import lol.hanyuu.iccardscanner.domain.model.CardType
@@ -49,6 +55,7 @@ fun HomeScreen(
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { maxOf(cards.size, 1) })
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(pagerState.currentPage) { viewModel.selectCard(pagerState.currentPage) }
 
@@ -70,14 +77,26 @@ fun HomeScreen(
     LaunchedEffect(updateState) {
         if (updateState is UpdateState.ReadyToInstall) {
             val file = (updateState as UpdateState.ReadyToInstall).file
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (canRequestPackageInstalls(context)) {
+                context.startActivity(createInstallIntent(context, file))
+            } else {
+                viewModel.requireInstallPermission(file)
+                context.startActivity(createInstallPermissionIntent(context))
             }
-            context.startActivity(intent)
         }
+    }
+
+    DisposableEffect(lifecycleOwner, updateState) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                updateState is UpdateState.InstallPermissionRequired &&
+                canRequestPackageInstalls(context)
+            ) {
+                viewModel.retryInstallAfterPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -86,6 +105,9 @@ fun HomeScreen(
             UpdateBanner(
                 state = updateState,
                 onDownload = viewModel::downloadUpdate,
+                onOpenInstallPermission = {
+                    context.startActivity(createInstallPermissionIntent(context))
+                },
                 onDismissError = viewModel::dismissUpdateError
             )
         }
@@ -200,9 +222,24 @@ fun HomeScreen(
 private fun UpdateBanner(
     state: UpdateState,
     onDownload: (String) -> Unit,
+    onOpenInstallPermission: () -> Unit,
     onDismissError: () -> Unit
 ) {
     when (state) {
+        UpdateState.Checking -> {
+            Surface(tonalElevation = 4.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("更新を確認中...", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
         is UpdateState.Available -> {
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -216,7 +253,7 @@ private fun UpdateBanner(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "v${state.versionCode} に更新可能",
+                        "${state.versionName} に更新可能",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -239,6 +276,29 @@ private fun UpdateBanner(
                         progress = { state.progress },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+            }
+        }
+        is UpdateState.InstallPermissionRequired -> {
+            Surface(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "更新APKのインストール許可が必要です",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Button(onClick = onOpenInstallPermission) {
+                        Text("許可")
+                    }
                 }
             }
         }
@@ -332,3 +392,27 @@ private val dateTimeFormatter = DateTimeFormatter
 
 private fun formatDateTime(epochMillis: Long): String =
     dateTimeFormatter.format(Instant.ofEpochMilli(epochMillis))
+
+private fun canRequestPackageInstalls(context: android.content.Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
+
+private fun createInstallPermissionIntent(context: android.content.Context): Intent =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    } else {
+        Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+private fun createInstallIntent(context: android.content.Context, file: java.io.File): Intent {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    return Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/vnd.android.package-archive")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+}

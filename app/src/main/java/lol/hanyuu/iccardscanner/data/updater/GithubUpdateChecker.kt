@@ -1,13 +1,20 @@
 package lol.hanyuu.iccardscanner.data.updater
 
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
 
-data class UpdateInfo(val versionCode: Int, val downloadUrl: String)
+data class UpdateInfo(
+    val versionCode: Int,
+    val versionName: String,
+    val assetName: String,
+    val assetSize: Long,
+    val downloadUrl: String
+)
 
 @Singleton
 class GithubUpdateChecker @Inject constructor() {
@@ -33,7 +40,7 @@ class GithubUpdateChecker @Inject constructor() {
             val json = JSONObject(body)
             val tagName = json.getString("tag_name")
             Log.d(TAG, "tag_name=$tagName")
-            val remoteVersionCode = tagName.removePrefix("v").toIntOrNull()
+            val remoteVersionCode = parseVersionCode(tagName)
             if (remoteVersionCode == null) {
                 Log.w(TAG, "Cannot parse versionCode from tag_name=$tagName")
                 return null
@@ -44,18 +51,42 @@ class GithubUpdateChecker @Inject constructor() {
                 return null
             }
 
-            val assets = json.getJSONArray("assets")
-            if (assets.length() == 0) {
-                Log.w(TAG, "Release has no assets")
+            val asset = findApkAsset(json.getJSONArray("assets"))
+            if (asset == null) {
+                Log.w(TAG, "Release has no APK asset")
                 return null
             }
-            val downloadUrl = assets.getJSONObject(0).getString("browser_download_url")
-            Log.d(TAG, "update available: v$remoteVersionCode -> $downloadUrl")
-            UpdateInfo(remoteVersionCode, downloadUrl)
+            val assetName = asset.getString("name")
+            val assetSize = asset.optLong("size", -1L)
+            val downloadUrl = asset.getString("browser_download_url")
+            if (!downloadUrl.startsWith("https://github.com/")) {
+                Log.w(TAG, "Unexpected APK download host: $downloadUrl")
+                return null
+            }
+            Log.d(TAG, "update available: v$remoteVersionCode asset=$assetName size=$assetSize url=$downloadUrl")
+            UpdateInfo(
+                versionCode = remoteVersionCode,
+                versionName = tagName,
+                assetName = assetName,
+                assetSize = assetSize,
+                downloadUrl = downloadUrl
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Update check failed", e)
             null
         }
+    }
+
+    private fun parseVersionCode(tagName: String): Int? =
+        Regex("""\d+""").find(tagName)?.value?.toIntOrNull()
+
+    private fun findApkAsset(assets: JSONArray): JSONObject? {
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name")
+            if (name.endsWith(".apk", ignoreCase = true)) return asset
+        }
+        return null
     }
 
     private companion object {
