@@ -15,7 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -26,6 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import lol.hanyuu.iccardscanner.domain.model.CardType
 import lol.hanyuu.iccardscanner.ui.theme.CardEdyBlue
 import lol.hanyuu.iccardscanner.ui.theme.CardIcocaYellow
@@ -33,6 +39,7 @@ import lol.hanyuu.iccardscanner.ui.theme.CardNanacoAmber
 import lol.hanyuu.iccardscanner.ui.theme.CardPasmoOrange
 import lol.hanyuu.iccardscanner.ui.theme.CardSuicaGreen
 import lol.hanyuu.iccardscanner.ui.theme.CardUnknownGray
+import java.util.concurrent.ConcurrentHashMap
 import lol.hanyuu.iccardscanner.ui.theme.CardWaonTeal
 
 private fun CardType.cardGradient(): Brush = when (this) {
@@ -54,6 +61,8 @@ private fun CardType.cardGradient(): Brush = when (this) {
         Brush.linearGradient(listOf(CardUnknownGray, Color(0xFF263238)))
 }
 
+private val transparentBitmapCache = ConcurrentHashMap<Int, Bitmap>()
+
 @Composable
 fun CardVisual(
     cardType: CardType,
@@ -71,15 +80,30 @@ fun CardVisual(
     ) {
         val drawableRes = cardType.drawableRes
         if (drawableRes != null) {
-            val transparentImage = remember(drawableRes) {
-                decodeWithTransparentBackground(context, drawableRes)
+            var transparentImage by remember(drawableRes) {
+                mutableStateOf(transparentBitmapCache[drawableRes])
             }
-            Image(
-                bitmap = transparentImage.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            LaunchedEffect(drawableRes) {
+                if (transparentImage == null) {
+                    transparentImage = withContext(Dispatchers.Default) {
+                        val cached = transparentBitmapCache[drawableRes]
+                        if (cached != null) {
+                            cached
+                        } else {
+                            val decoded = decodeWithTransparentBackground(context.applicationContext, drawableRes)
+                            transparentBitmapCache.putIfAbsent(drawableRes, decoded) ?: decoded
+                        }
+                    }
+                }
+            }
+            transparentImage?.let { bitmap ->
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
         Column(
             modifier = Modifier
