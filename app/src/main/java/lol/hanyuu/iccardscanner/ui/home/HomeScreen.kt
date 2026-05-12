@@ -91,11 +91,14 @@ fun HomeScreen(
 
     DisposableEffect(lifecycleOwner, updateState) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME &&
-                updateState is UpdateState.InstallPermissionRequired &&
-                canRequestPackageInstalls(context)
-            ) {
-                viewModel.retryInstallAfterPermission()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (updateState is UpdateState.InstallPermissionRequired &&
+                    canRequestPackageInstalls(context)
+                ) {
+                    viewModel.retryInstallAfterPermission()
+                } else {
+                    viewModel.checkForUpdateIfNeeded()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

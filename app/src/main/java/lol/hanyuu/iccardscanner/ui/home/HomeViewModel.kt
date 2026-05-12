@@ -1,6 +1,7 @@
 package lol.hanyuu.iccardscanner.ui.home
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,9 +57,10 @@ class HomeViewModel @Inject constructor(
 
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState
+    private var lastUpdateCheckStartedAt = 0L
 
     init {
-        checkForUpdate()
+        checkForUpdate(force = true)
     }
 
     fun selectCard(index: Int) { _selectedIndex.value = index }
@@ -80,7 +82,28 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun checkForUpdate() {
+    fun checkForUpdateIfNeeded() {
+        checkForUpdate(force = false)
+    }
+
+    private fun checkForUpdate(force: Boolean) {
+        val state = _updateState.value
+        if (state is UpdateState.Checking ||
+            state is UpdateState.Downloading ||
+            state is UpdateState.ReadyToInstall ||
+            state is UpdateState.InstallPermissionRequired
+        ) {
+            Log.d(TAG, "skip update check: state=${state::class.simpleName}")
+            return
+        }
+
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastUpdateCheckStartedAt < UPDATE_CHECK_INTERVAL_MS) {
+            Log.d(TAG, "skip update check: checkedRecently=${now - lastUpdateCheckStartedAt}ms")
+            return
+        }
+        lastUpdateCheckStartedAt = now
+
         viewModelScope.launch(Dispatchers.IO) {
             _updateState.value = UpdateState.Checking
             val info = updateChecker.checkForUpdate(BuildConfig.VERSION_CODE)
@@ -150,5 +173,6 @@ class HomeViewModel @Inject constructor(
 
     private companion object {
         const val TAG = "HomeViewModel"
+        const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
     }
 }
