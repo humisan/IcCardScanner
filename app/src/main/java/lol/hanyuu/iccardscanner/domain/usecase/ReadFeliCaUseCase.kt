@@ -50,15 +50,16 @@ class ReadFeliCaUseCase @Inject constructor(
                 Log.d(TAG, "nanaco/edy probe result=$cardType")
             }
 
-            val transitBlocks = if (cardType.isTransitIc) {
+            val transitHistory = if (cardType.isTransitIc) {
                 runCatching { readTransitHistoryBlocks(reader) }
                     .onFailure { e -> Log.w(TAG, "History read failed (non-fatal): ${e.message}") }
-                    .getOrDefault(emptyList())
+                    .getOrDefault(TransitHistoryRead(emptyList(), isComplete = false))
             } else {
-                emptyList()
+                TransitHistoryRead(emptyList(), isComplete = true)
             }
+            val transitBlocks = transitHistory.blocks
             if (transitBlocks.isNotEmpty()) {
-                Log.d(TAG, "transitBlocks.size=${transitBlocks.size}")
+                Log.d(TAG, "transitBlocks.size=${transitBlocks.size} complete=${transitHistory.isComplete}")
             }
 
             val balance = if (cardType.isTransitIc && transitBlocks.isNotEmpty()) {
@@ -89,8 +90,13 @@ class ReadFeliCaUseCase @Inject constructor(
 
             if (cardType.isTransitIc && transitBlocks.isNotEmpty()) {
                 val records = parseHistory.invoke(idmHex, transitBlocks)
-                historyRepository.replaceTransactions(idmHex, records)
-                Log.d(TAG, "saved ${records.size} history records")
+                if (transitHistory.isComplete) {
+                    historyRepository.replaceTransactions(idmHex, records)
+                    Log.d(TAG, "replaced ${records.size} history records")
+                } else {
+                    historyRepository.insertTransactionsIgnoreConflicts(records)
+                    Log.w(TAG, "partial history read; merged ${records.size} records without deleting existing history")
+                }
             }
 
             idmHex
@@ -129,16 +135,21 @@ class ReadFeliCaUseCase @Inject constructor(
         -1
     }
 
-    private fun readTransitHistoryBlocks(reader: FeliCaReader): List<ByteArray> {
+    private fun readTransitHistoryBlocks(reader: FeliCaReader): TransitHistoryRead {
         val blocks = mutableListOf<ByteArray>()
+        var isComplete = true
         for (index in 0 until TRANSIT_HISTORY_BLOCK_COUNT) {
             val block = runCatching { reader.readBlocks(TRANSIT_HISTORY_SERVICE_CODE, listOf(index)).first() }
                 .onFailure { e -> Log.w(TAG, "History block $index read failed: ${e.message}") }
-                .getOrNull() ?: break
+                .getOrNull()
+            if (block == null) {
+                isComplete = false
+                break
+            }
             blocks += block
         }
-        Log.d(TAG, "historyRead requested=$TRANSIT_HISTORY_BLOCK_COUNT read=${blocks.size}")
-        return blocks
+        Log.d(TAG, "historyRead requested=$TRANSIT_HISTORY_BLOCK_COUNT read=${blocks.size} complete=$isComplete")
+        return TransitHistoryRead(blocks, isComplete)
     }
 
     private fun parseTransitBalance(block: ByteArray): Int =
@@ -172,4 +183,9 @@ class ReadFeliCaUseCase @Inject constructor(
         const val WAON_BALANCE_SERVICE_CODE = 0x6817
         const val EDY_BALANCE_SERVICE_CODE = 0x170F
     }
+
+    private data class TransitHistoryRead(
+        val blocks: List<ByteArray>,
+        val isComplete: Boolean
+    )
 }
