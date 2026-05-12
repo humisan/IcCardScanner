@@ -60,8 +60,10 @@ class HomeViewModel @Inject constructor(
     private var lastUpdateCheckStartedAt = 0L
 
     init {
-        if (!restorePendingUpdate()) {
-            checkForUpdate(force = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!restorePendingUpdate()) {
+                checkForUpdate(force = true)
+            }
         }
     }
 

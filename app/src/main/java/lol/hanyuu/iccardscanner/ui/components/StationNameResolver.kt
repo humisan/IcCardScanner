@@ -17,6 +17,8 @@ object StationNameResolver {
     @Volatile
     private var cachedStations: Map<Int, StationLabel>? = null
 
+    fun preWarm(context: Context) { loadStations(context) }
+
     fun resolve(context: Context, rawAreaCode: Int?, stationCode: Int): StationLabel? {
         val line = (stationCode ushr 8) and 0xFF
         val station = stationCode and 0xFF
