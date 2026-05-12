@@ -11,6 +11,7 @@ import lol.hanyuu.iccardscanner.ui.detail.CardDetailScreen
 import lol.hanyuu.iccardscanner.ui.history.HistoryScreen
 import lol.hanyuu.iccardscanner.ui.home.HomeScreen
 import lol.hanyuu.iccardscanner.ui.settings.SettingsScreen
+import lol.hanyuu.iccardscanner.ui.summary.MonthlySummaryScreen
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
@@ -19,6 +20,9 @@ sealed class Screen(val route: String) {
     }
     data object CardDetail : Screen("detail/{cardIdm}") {
         fun createRoute(cardIdm: String) = "detail/$cardIdm"
+    }
+    data object Summary : Screen("summary/{cardIdm}") {
+        fun createRoute(cardIdm: String) = "summary/$cardIdm"
     }
     data object Settings : Screen("settings")
 }
@@ -36,6 +40,7 @@ fun NavGraph(
                 onScanStateReset = onScanStateReset,
                 onNavigateToHistory = { idm -> navController.navigate(Screen.History.createRoute(idm)) },
                 onNavigateToDetail = { idm -> navController.navigate(Screen.CardDetail.createRoute(idm)) },
+                onNavigateToSummary = { idm -> navController.navigate(Screen.Summary.createRoute(idm)) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
@@ -50,6 +55,12 @@ fun NavGraph(
             arguments = listOf(navArgument("cardIdm") { type = NavType.StringType })
         ) {
             CardDetailScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(
+            route = Screen.Summary.route,
+            arguments = listOf(navArgument("cardIdm") { type = NavType.StringType })
+        ) {
+            MonthlySummaryScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable(Screen.Settings.route) {
             SettingsScreen(onNavigateBack = { navController.popBackStack() })

@@ -13,6 +13,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,12 +41,14 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     scanState: ScanState,
     onScanStateReset: () -> Unit,
     onNavigateToHistory: (String) -> Unit,
     onNavigateToDetail: (String) -> Unit,
+    onNavigateToSummary: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -56,6 +59,8 @@ fun HomeScreen(
     val pagerState = rememberPagerState(pageCount = { maxOf(cards.size, 1) })
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentCard = cards.getOrNull(selectedIndex)
+    var menuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(pagerState.currentPage) { viewModel.selectCard(pagerState.currentPage) }
 
@@ -108,6 +113,42 @@ fun HomeScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {},
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                actions = {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.Menu, contentDescription = "メニュー")
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("月別サマリー") },
+                                onClick = {
+                                    menuExpanded = false
+                                    currentCard?.let { onNavigateToSummary(it.idm) }
+                                },
+                                enabled = currentCard != null
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("設定") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onNavigateToSettings()
+                                }
+                            )
+                        }
+                    }
+                }
+            )
+        },
         bottomBar = {
             UpdateBanner(
                 state = updateState,
@@ -161,7 +202,6 @@ fun HomeScreen(
             item { Spacer(Modifier.height(24.dp)) }
 
             item {
-                val currentCard = cards.getOrNull(selectedIndex)
                 BalanceSection(card = currentCard, modifier = Modifier.padding(horizontal = 24.dp))
             }
 
@@ -177,7 +217,6 @@ fun HomeScreen(
             item { Spacer(Modifier.height(24.dp)) }
 
             item {
-                val currentCard = cards.getOrNull(selectedIndex)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
