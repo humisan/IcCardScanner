@@ -13,7 +13,7 @@ import lol.hanyuu.iccardscanner.data.db.entity.TransactionRecordEntity
 
 @Database(
     entities = [CardEntity::class, ScanRecordEntity::class, TransactionRecordEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

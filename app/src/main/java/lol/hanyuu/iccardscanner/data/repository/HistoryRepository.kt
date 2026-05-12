@@ -18,11 +18,8 @@ class HistoryRepository @Inject constructor(
     fun getRecentTransactions(cardIdm: String, limit: Int): Flow<List<TransactionRecord>> =
         transactionRecordDao.getRecentByCard(cardIdm, limit).map { list -> list.map { it.toDomain() } }
 
-    suspend fun insertTransactionsIgnoreConflicts(records: List<TransactionRecordEntity>) =
-        transactionRecordDao.insertIgnoreConflict(records)
-
-    suspend fun replaceTransactions(cardIdm: String, records: List<TransactionRecordEntity>) =
-        transactionRecordDao.replaceByCard(cardIdm, records)
+    suspend fun mergeTransactions(records: List<TransactionRecordEntity>) =
+        transactionRecordDao.insertOrReplace(records)
 
     private fun TransactionRecordEntity.toDomain() = TransactionRecord(
         id = id,

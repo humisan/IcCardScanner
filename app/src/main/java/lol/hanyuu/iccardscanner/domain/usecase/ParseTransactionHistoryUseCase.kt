@@ -58,6 +58,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
             balance = balance,
             entryStationCode = encodeStation(entryLine, entryStation),
             exitStationCode = encodeStation(exitLine, exitStation),
+            sequence = sequence,
             details = buildDetails(terminalType, processCode, region, sequence)
         )
     }
@@ -71,6 +72,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
             balance = balance,
             entryStationCode = entryStationCode,
             exitStationCode = exitStationCode,
+            sequence = sequence,
             details = details
         )
 
@@ -115,6 +117,7 @@ class ParseTransactionHistoryUseCase @Inject constructor() {
         val balance: Int,
         val entryStationCode: Int?,
         val exitStationCode: Int?,
+        val sequence: Int,
         val details: String
     )
 }

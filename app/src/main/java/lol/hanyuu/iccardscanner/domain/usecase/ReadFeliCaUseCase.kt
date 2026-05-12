@@ -90,13 +90,8 @@ class ReadFeliCaUseCase @Inject constructor(
 
             if (cardType.isTransitIc && transitBlocks.isNotEmpty()) {
                 val records = parseHistory.invoke(idmHex, transitBlocks)
-                if (transitHistory.isComplete) {
-                    historyRepository.replaceTransactions(idmHex, records)
-                    Log.d(TAG, "replaced ${records.size} history records")
-                } else {
-                    historyRepository.insertTransactionsIgnoreConflicts(records)
-                    Log.w(TAG, "partial history read; merged ${records.size} records without deleting existing history")
-                }
+                historyRepository.mergeTransactions(records)
+                Log.d(TAG, "merged ${records.size} history records (complete=${transitHistory.isComplete})")
             }
 
             idmHex
