@@ -20,7 +20,18 @@ jobs:
           VERSION_CODE=$((1000 + ${{ github.run_number }}))
           sed -i "s/versionCode = [0-9]*/versionCode = $VERSION_CODE/" app/build.gradle.kts
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.IC_CARD_SCANNER_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ci
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > ci/release.keystore
       - name: Build APK
+        env:
+          IC_CARD_SCANNER_KEYSTORE_FILE: ci/release.keystore
+          IC_CARD_SCANNER_KEYSTORE_PASSWORD: ${{ secrets.IC_CARD_SCANNER_KEYSTORE_PASSWORD }}
+          IC_CARD_SCANNER_KEY_ALIAS: ${{ secrets.IC_CARD_SCANNER_KEY_ALIAS }}
+          IC_CARD_SCANNER_KEY_PASSWORD: ${{ secrets.IC_CARD_SCANNER_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug

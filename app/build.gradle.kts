@@ -21,10 +21,24 @@ android {
 
     signingConfigs {
         create("ci") {
-            storeFile = rootProject.file("ci/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            storeFile = rootProject.file(
+                providers.gradleProperty("IC_CARD_SCANNER_KEYSTORE_FILE")
+                    .orElse(providers.environmentVariable("IC_CARD_SCANNER_KEYSTORE_FILE"))
+                    .orElse("ci/debug.keystore")
+                    .get()
+            )
+            storePassword = providers.gradleProperty("IC_CARD_SCANNER_KEYSTORE_PASSWORD")
+                .orElse(providers.environmentVariable("IC_CARD_SCANNER_KEYSTORE_PASSWORD"))
+                .orElse("")
+                .get()
+            keyAlias = providers.gradleProperty("IC_CARD_SCANNER_KEY_ALIAS")
+                .orElse(providers.environmentVariable("IC_CARD_SCANNER_KEY_ALIAS"))
+                .orElse("")
+                .get()
+            keyPassword = providers.gradleProperty("IC_CARD_SCANNER_KEY_PASSWORD")
+                .orElse(providers.environmentVariable("IC_CARD_SCANNER_KEY_PASSWORD"))
+                .orElse("")
+                .get()
         }
     }
 
