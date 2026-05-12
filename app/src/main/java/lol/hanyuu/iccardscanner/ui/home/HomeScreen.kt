@@ -1,5 +1,6 @@
 package lol.hanyuu.iccardscanner.ui.home
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,9 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lol.hanyuu.iccardscanner.ScanState
@@ -43,7 +46,9 @@ fun HomeScreen(
     val cards by viewModel.cards.collectAsStateWithLifecycle()
     val selectedIndex by viewModel.selectedIndex.collectAsStateWithLifecycle()
     val recentTransactions by viewModel.recentTransactions.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { maxOf(cards.size, 1) })
+    val context = LocalContext.current
 
     LaunchedEffect(pagerState.currentPage) { viewModel.selectCard(pagerState.currentPage) }
 
@@ -62,7 +67,29 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+    LaunchedEffect(updateState) {
+        if (updateState is UpdateState.ReadyToInstall) {
+            val file = (updateState as UpdateState.ReadyToInstall).file
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            UpdateBanner(
+                state = updateState,
+                onDownload = viewModel::downloadUpdate,
+                onDismissError = viewModel::dismissUpdateError
+            )
+        }
+    ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -166,6 +193,79 @@ fun HomeScreen(
 
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+}
+
+@Composable
+private fun UpdateBanner(
+    state: UpdateState,
+    onDownload: (String) -> Unit,
+    onDismissError: () -> Unit
+) {
+    when (state) {
+        is UpdateState.Available -> {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "v${state.versionCode} に更新可能",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Button(onClick = { onDownload(state.downloadUrl) }) {
+                        Text("更新")
+                    }
+                }
+            }
+        }
+        is UpdateState.Downloading -> {
+            Surface(tonalElevation = 4.dp) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text("ダウンロード中...", style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { state.progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+        is UpdateState.Error -> {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "更新に失敗しました",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    TextButton(onClick = onDismissError) {
+                        Text("閉じる")
+                    }
+                }
+            }
+        }
+        else -> {}
     }
 }
 
