@@ -65,6 +65,10 @@ class HomeViewModel @Inject constructor(
 
     fun dismissUpdateError() { _updateState.value = UpdateState.Idle }
 
+    fun reportInstallLaunchFailed(message: String) {
+        _updateState.value = UpdateState.Error(message)
+    }
+
     fun requireInstallPermission(file: File) {
         _updateState.value = UpdateState.InstallPermissionRequired(file)
     }

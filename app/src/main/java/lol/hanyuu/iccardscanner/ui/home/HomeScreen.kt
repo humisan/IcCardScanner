@@ -78,7 +78,10 @@ fun HomeScreen(
         if (updateState is UpdateState.ReadyToInstall) {
             val file = (updateState as UpdateState.ReadyToInstall).file
             if (canRequestPackageInstalls(context)) {
-                context.startActivity(createInstallIntent(context, file))
+                runCatching { context.startActivity(createInstallIntent(context, file)) }
+                    .onFailure { e ->
+                        viewModel.reportInstallLaunchFailed(e.message ?: "APKインストール画面を開けませんでした")
+                    }
             } else {
                 viewModel.requireInstallPermission(file)
                 context.startActivity(createInstallPermissionIntent(context))
@@ -107,6 +110,17 @@ fun HomeScreen(
                 onDownload = viewModel::downloadUpdate,
                 onOpenInstallPermission = {
                     context.startActivity(createInstallPermissionIntent(context))
+                },
+                onInstall = { file ->
+                    if (canRequestPackageInstalls(context)) {
+                        runCatching { context.startActivity(createInstallIntent(context, file)) }
+                            .onFailure { e ->
+                                viewModel.reportInstallLaunchFailed(e.message ?: "APKインストール画面を開けませんでした")
+                            }
+                    } else {
+                        viewModel.requireInstallPermission(file)
+                        context.startActivity(createInstallPermissionIntent(context))
+                    }
                 },
                 onDismissError = viewModel::dismissUpdateError
             )
@@ -223,6 +237,7 @@ private fun UpdateBanner(
     state: UpdateState,
     onDownload: (String) -> Unit,
     onOpenInstallPermission: () -> Unit,
+    onInstall: (java.io.File) -> Unit,
     onDismissError: () -> Unit
 ) {
     when (state) {
@@ -276,6 +291,29 @@ private fun UpdateBanner(
                         progress = { state.progress },
                         modifier = Modifier.fillMaxWidth()
                     )
+                }
+            }
+        }
+        is UpdateState.ReadyToInstall -> {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "更新APKのインストール待ちです",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Button(onClick = { onInstall(state.file) }) {
+                        Text("インストール")
+                    }
                 }
             }
         }
