@@ -8,6 +8,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import lol.hanyuu.iccardscanner.data.alert.BalanceAlertManager
 import lol.hanyuu.iccardscanner.domain.usecase.ReadFeliCaUseCase
 import javax.inject.Inject
 
@@ -20,7 +21,8 @@ sealed class ScanState {
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val readFeliCaUseCase: ReadFeliCaUseCase
+    private val readFeliCaUseCase: ReadFeliCaUseCase,
+    private val balanceAlertManager: BalanceAlertManager
 ) : ViewModel() {
 
     private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
@@ -33,6 +35,7 @@ class MainViewModel @Inject constructor(
             try {
                 val idm = readFeliCaUseCase(tag)
                 _scanState.value = ScanState.Success(idm)
+                balanceAlertManager.checkAndNotify(idm)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to read FeliCa tag", e)
                 _scanState.value = ScanState.Error(e.message ?: "IC card read failed")

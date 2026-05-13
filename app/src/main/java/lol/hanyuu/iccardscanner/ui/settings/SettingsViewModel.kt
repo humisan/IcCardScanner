@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lol.hanyuu.iccardscanner.BuildConfig
+import lol.hanyuu.iccardscanner.data.alert.BalanceAlertManager
 import lol.hanyuu.iccardscanner.data.repository.CardRepository
 import lol.hanyuu.iccardscanner.data.updater.GithubUpdateChecker
 import lol.hanyuu.iccardscanner.domain.model.Card
@@ -32,11 +33,20 @@ data class UpdateInfoUiState(
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val cardRepository: CardRepository,
-    private val updateChecker: GithubUpdateChecker
+    private val updateChecker: GithubUpdateChecker,
+    private val balanceAlertManager: BalanceAlertManager
 ) : ViewModel() {
 
     val cards: StateFlow<List<Card>> = cardRepository.getAllCards()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _alertThreshold = MutableStateFlow(balanceAlertManager.getThreshold())
+    val alertThreshold: StateFlow<Int> = _alertThreshold
+
+    fun setAlertThreshold(value: Int) {
+        balanceAlertManager.setThreshold(value)
+        _alertThreshold.value = value
+    }
 
     private val _updateInfo = MutableStateFlow(UpdateInfoUiState())
     val updateInfo: StateFlow<UpdateInfoUiState> = _updateInfo

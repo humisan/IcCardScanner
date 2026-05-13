@@ -1,6 +1,7 @@
 package lol.hanyuu.iccardscanner.ui.settings
 
 import android.content.Intent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,8 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lol.hanyuu.iccardscanner.domain.model.Card
+import java.text.NumberFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,8 +30,18 @@ fun SettingsScreen(
 ) {
     val cards by viewModel.cards.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
+    val alertThreshold by viewModel.alertThreshold.collectAsStateWithLifecycle()
     var cardToDelete by remember { mutableStateOf<Card?>(null) }
+    var showThresholdDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    if (showThresholdDialog) {
+        ThresholdPickerDialog(
+            current = alertThreshold,
+            onSelect = { viewModel.setAlertThreshold(it); showThresholdDialog = false },
+            onDismiss = { showThresholdDialog = false }
+        )
+    }
 
     cardToDelete?.let { card ->
         AlertDialog(
@@ -143,6 +156,33 @@ fun SettingsScreen(
 
             item {
                 Text(
+                    "通知",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            item {
+                ListItem(
+                    modifier = Modifier.clickable { showThresholdDialog = true },
+                    headlineContent = { Text("残高アラート") },
+                    supportingContent = { Text("スキャン後に残高がしきい値を下回ると通知") },
+                    trailingContent = {
+                        Text(
+                            formatThreshold(alertThreshold),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                )
+            }
+
+            item { HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp)) }
+
+            item {
+                Text(
                     "カード",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
@@ -186,3 +226,36 @@ fun SettingsScreen(
         }
     }
 }
+
+@Composable
+private fun ThresholdPickerDialog(current: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+    val options = listOf(-1 to "オフ", 500 to "¥500", 1_000 to "¥1,000", 2_000 to "¥2,000", 3_000 to "¥3,000")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("残高アラートのしきい値") },
+        text = {
+            Column {
+                options.forEach { (value, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(value) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = current == value, onClick = { onSelect(value) })
+                        Spacer(Modifier.width(8.dp))
+                        Text(label)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("キャンセル") }
+        }
+    )
+}
+
+private fun formatThreshold(value: Int): String =
+    if (value < 0) "オフ"
+    else "¥${NumberFormat.getNumberInstance(Locale.JAPAN).format(value)}"

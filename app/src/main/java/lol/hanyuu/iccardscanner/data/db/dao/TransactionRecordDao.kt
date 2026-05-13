@@ -12,6 +12,9 @@ interface TransactionRecordDao {
     @Query("SELECT * FROM transaction_records WHERE cardIdm = :idm ORDER BY transactionDate DESC, id ASC LIMIT :limit")
     fun getRecentByCard(idm: String, limit: Int): Flow<List<TransactionRecordEntity>>
 
+    @Query("SELECT balance FROM transaction_records WHERE cardIdm = :idm ORDER BY transactionDate DESC, id ASC LIMIT 1")
+    suspend fun getLatestBalance(idm: String): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(records: List<TransactionRecordEntity>)
 
